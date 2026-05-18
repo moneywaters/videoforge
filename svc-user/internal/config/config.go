@@ -8,9 +8,11 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
+	"github.com/videoforge/backend/pkg/auth"
 	"github.com/videoforge/backend/pkg/config"
 )
 
@@ -29,6 +31,7 @@ type Config struct {
 	Server   config.ServerConfig
 	Database DatabaseConfig
 	JWT      JWTConfig
+	NeonAuth *auth.NeonAuthClient
 }
 
 // DatabaseConfig holds database configuration
@@ -51,8 +54,12 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to load server config: %w", err)
 	}
 
-	// Get environment variables
-	dbURL := os.Getenv("DATABASE_URL")
+	// Get database URL - prefer Neon-specific URL if set, otherwise fallback to DATABASE_URL or local
+	// Priority: NEON_DATABASE_URL_* > DATABASE_URL > local postgres
+	dbURL := os.Getenv("DATABASE_URL_USER")
+	if dbURL == "" {
+		dbURL = os.Getenv("DATABASE_URL")
+	}
 	if dbURL == "" {
 		dbURL = "postgres://videoforge:password@localhost:5432/videoforge?sslmode=disable"
 	}
@@ -63,10 +70,23 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	poolConfig.MaxConns = 25
-	poolConfig.MinConns = 5
-	poolConfig.MaxConnLifetime = time.Hour
-	poolConfig.MaxConnIdleTime = 30 * time.Minute
+	// Check if this is a Neon connection (serverless PostgreSQL)
+	// Neon has lower connection limits and requires different pool settings
+	isNeon := strings.Contains(dbURL, "neon.tech") || strings.Contains(dbURL, "ep-")
+	if isNeon {
+		// Neon free tier: max 10 connections
+		poolConfig.MaxConns = 10
+		poolConfig.MinConns = 2
+		poolConfig.MaxConnLifetime = time.Hour
+		poolConfig.MaxConnIdleTime = 30 * time.Minute
+		poolConfig.ConnConfig.ConnectTimeout = 10 * time.Second
+	} else {
+		// Local/traditional PostgreSQL
+		poolConfig.MaxConns = 25
+		poolConfig.MinConns = 5
+		poolConfig.MaxConnLifetime = time.Hour
+		poolConfig.MaxConnIdleTime = 30 * time.Minute
+	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {
@@ -79,13 +99,30 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to load JWT keys: %w", err)
 	}
 
+	// Initialize Neon Auth client (optional)
+	neonAPIKey := os.Getenv("NEON_API_KEY")
+	neonProjectID := os.Getenv("NEON_PROJECT_ID")
+	neonBranchID := os.Getenv("NEON_BRANCH_ID")
+	var neonAuthClient *auth.NeonAuthClient
+	if neonAPIKey != "" && neonProjectID != "" && neonBranchID != "" {
+		neonAuthConfig := auth.NeonAuthConfig{
+			APIKey:       neonAPIKey,
+			ProjectID:    neonProjectID,
+			BranchID:     neonBranchID,
+			CookieSecret: os.Getenv("NEON_AUTH_COOKIE_SECRET"),
+		}
+		neonAuthClient = auth.NewNeonAuthClient(neonAuthConfig)
+		fmt.Println("Neon Auth configured")
+	}
+
 	return &Config{
 		Server:   serverConfig,
 		Database: DatabaseConfig{
 			Pool: pool,
 			URL:  dbURL,
 		},
-		JWT: jwtConfig,
+		JWT:      jwtConfig,
+		NeonAuth: neonAuthClient,
 	}, nil
 }
 

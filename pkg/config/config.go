@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
@@ -15,6 +16,26 @@ type ServerConfig struct {
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 }
 
+// DatabaseConfig holds database configuration with support for Neon
+type DatabaseConfig struct {
+	Host     string `envconfig:"DATABASE_HOST" default:"localhost"`
+	Port     string `envconfig:"DATABASE_PORT" default:"5432"`
+	Username string `envconfig:"DATABASE_USERNAME" default:"videoforge"`
+	Password string `envconfig:"DATABASE_PASSWORD" default:"password"`
+	Database string `envconfig:"DATABASE_NAME" default:"videoforge"`
+	URL      string `envconfig:"DATABASE_URL"` // Full connection URL (takes precedence)
+}
+
+// NATSConfig holds NATS configuration
+type NATSConfig struct {
+	URL string `envconfig:"NATS_URL"`
+}
+
+// LoggerConfig holds logger configuration
+type LoggerConfig struct {
+	Level string `envconfig:"LOG_LEVEL" default:"info"`
+}
+
 // Config holds all application configuration loaded from environment variables.
 // It supports loading from .env file for local development.
 type Config struct {
@@ -22,6 +43,7 @@ type Config struct {
 	Port string `envconfig:"PORT" default:"8080"`
 
 	// Database configuration
+	// Priority: NEON_DATABASE_URL_* > DATABASE_URL > individual params
 	DatabaseURL string `envconfig:"DATABASE_URL"`
 
 	// NATS configuration
@@ -35,6 +57,26 @@ type Config struct {
 
 	// Optional: App name for logging
 	AppName string `envconfig:"APP_NAME" default:"videoforge"`
+}
+
+// LoadFromEnv loads configuration with a specific prefix
+func LoadFromEnv(prefix string, cfg interface{}) error {
+	_ = godotenv.Load()
+	return envconfig.Process(prefix, cfg)
+}
+
+// GetDatabaseURL returns the effective database URL.
+// It checks for service-specific Neon URLs first, then falls back to DATABASE_URL.
+func GetDatabaseURL(serviceName string) string {
+	// Check for service-specific Neon URL (e.g., DATABASE_URL_USER)
+	if serviceName != "" {
+		neonURL := os.Getenv("DATABASE_URL_" + strings.ToUpper(serviceName))
+		if neonURL != "" {
+			return neonURL
+		}
+	}
+	// Fall back to standard DATABASE_URL
+	return os.Getenv("DATABASE_URL")
 }
 
 // Load loads configuration from environment variables.

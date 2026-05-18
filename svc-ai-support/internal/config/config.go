@@ -8,6 +8,7 @@ import (
 	"encoding/pem"
 	"fmt"
 	"os"
+	"strings"
 	"time"
 
 	"github.com/jackc/pgx/v5/pgxpool"
@@ -51,8 +52,11 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to load server config: %w", err)
 	}
 
-	// Get environment variables
-	dbURL := os.Getenv("DATABASE_URL")
+	// Priority: NEON_DATABASE_URL_* > DATABASE_URL > local postgres
+	dbURL := os.Getenv("DATABASE_URL_AI_SUPPORT")
+	if dbURL == "" {
+		dbURL = os.Getenv("DATABASE_URL")
+	}
 	if dbURL == "" {
 		dbURL = "postgres://videoforge:password@localhost:5432/videoforge?sslmode=disable"
 	}
@@ -63,10 +67,21 @@ func Load() (*Config, error) {
 		return nil, fmt.Errorf("failed to parse database URL: %w", err)
 	}
 
-	poolConfig.MaxConns = 25
-	poolConfig.MinConns = 5
-	poolConfig.MaxConnLifetime = time.Hour
-	poolConfig.MaxConnIdleTime = 30 * time.Minute
+	// Check if this is a Neon connection (serverless PostgreSQL)
+	isNeon := strings.Contains(dbURL, "neon.tech") || strings.Contains(dbURL, "ep-")
+	if isNeon {
+		// Neon free tier: max 10 connections
+		poolConfig.MaxConns = 10
+		poolConfig.MinConns = 2
+		poolConfig.MaxConnLifetime = time.Hour
+		poolConfig.MaxConnIdleTime = 30 * time.Minute
+		poolConfig.ConnConfig.ConnectTimeout = 10 * time.Second
+	} else {
+		poolConfig.MaxConns = 25
+		poolConfig.MinConns = 5
+		poolConfig.MaxConnLifetime = time.Hour
+		poolConfig.MaxConnIdleTime = 30 * time.Minute
+	}
 
 	pool, err := pgxpool.NewWithConfig(context.Background(), poolConfig)
 	if err != nil {

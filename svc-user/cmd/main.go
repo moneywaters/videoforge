@@ -54,6 +54,13 @@ func main() {
 	authHandler := handler.NewAuthHandler(authService)
 	userHandler := handler.NewUserHandler(userService)
 
+	// Initialize Neon Auth handler (optional, falls back if not configured)
+	var neonAuthHandler *handler.NeonAuthHandler
+	if cfg.NeonAuth != nil && cfg.NeonAuth.IsConfigured() {
+		neonAuthHandler = handler.NewNeonAuthHandler(cfg.NeonAuth, authService)
+		logger.Info("neon auth enabled")
+	}
+
 	// Initialize middleware
 	recoverMw := backendmiddleware.Recover()
 	loggerMw := backendmiddleware.Logger()
@@ -79,6 +86,15 @@ func main() {
 	api.HandleFunc("/api/v1/auth/login", authHandler.Login)
 	api.HandleFunc("/api/v1/auth/refresh", authHandler.Refresh)
 	api.HandleFunc("/api/v1/auth/logout", authHandler.Logout)
+
+	// Neon Auth routes (optional)
+	if neonAuthHandler != nil {
+		api.HandleFunc("/api/v1/auth/neon/register", neonAuthHandler.Register)
+		api.HandleFunc("/api/v1/auth/neon/login", neonAuthHandler.Login)
+		api.HandleFunc("/api/v1/auth/neon/session", neonAuthHandler.GetSession)
+		api.HandleFunc("/api/v1/auth/neon/logout", neonAuthHandler.Logout)
+		api.HandleFunc("/api/v1/auth/neon/refresh", neonAuthHandler.Refresh)
+	}
 
 	// Protected routes
 	protected := http.NewServeMux()
