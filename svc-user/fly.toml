@@ -1,0 +1,35 @@
+app = "videoforge-svc-user"
+primary_region = "iad"
+
+[build]
+  builder = "Dockerfile"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+
+[[services]]
+  protocol = "tcp"
+  concurrency = "soft"
+  concurrency_hard_limit = 20
+
+  [[services.ports]]
+    port = 443
+    handlers = ["http"]
+
+  [[services.ports]]
+    port = 80
+    handlers = ["http"]
+
+[environment]
+  PORT = "8080"
+  LOG_LEVEL = "info"
+
+[[vm]]
+  size = "shared-cpu-1x"
+  cpu_kind = "shared"
+  cpus = 1
+  memory_mb = 256
+
+[[statsex]]
+  endpoint = "/health"

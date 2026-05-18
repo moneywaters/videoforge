@@ -1,0 +1,13 @@
+app = "videoforge-notification"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "8080"
+  ENVIRONMENT = "production"
+  NATS_URL = "nats://NATS_HOST:4222"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
