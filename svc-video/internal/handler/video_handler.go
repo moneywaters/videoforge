@@ -75,6 +75,26 @@ func (h *VideoHandler) HandleVideoAction(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		h.GetUploadURL(w, r, videoID)
+	case "download-url":
+		switch r.Method {
+		case "GET":
+			h.GetDownloadURL(w, r, videoID)
+		default:
+			errors.WriteError(r.Context(), w, errors.BadRequest("method not allowed"))
+		}
+	case "thumbnail-url":
+		switch r.Method {
+		case "GET":
+			h.GetThumbnailURL(w, r, videoID)
+		default:
+			errors.WriteError(r.Context(), w, errors.BadRequest("method not allowed"))
+		}
+	case "confirm-upload":
+		if r.Method != "POST" {
+			errors.WriteError(r.Context(), w, errors.BadRequest("method not allowed"))
+			return
+		}
+		h.ConfirmUpload(w, r, videoID)
 	case "submit":
 		if r.Method != "POST" {
 			errors.WriteError(r.Context(), w, errors.BadRequest("method not allowed"))
@@ -114,6 +134,12 @@ func (h *VideoHandler) HandleVideoAction(w http.ResponseWriter, r *http.Request)
 			return
 		}
 		h.GetFeedback(w, r, videoID)
+	case "delete":
+		if r.Method != "DELETE" && r.Method != "POST" {
+			errors.WriteError(r.Context(), w, errors.BadRequest("method not allowed"))
+			return
+		}
+		h.DeleteVideo(w, r, videoID)
 	default:
 		errors.WriteError(r.Context(), w, errors.NotFound("endpoint not found"))
 	}
@@ -517,4 +543,111 @@ func (h *VideoHandler) GetFeedback(w http.ResponseWriter, r *http.Request, video
 
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(model.ListFeedbackResponse{Feedback: feedback})
+}
+
+// GetDownloadURL handles GET /api/v1/videos/:id/download-url
+func (h *VideoHandler) GetDownloadURL(w http.ResponseWriter, r *http.Request, videoID string) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		errors.WriteError(r.Context(), w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	resp, err := h.service.GetDownloadURL(r.Context(), videoID)
+	if err != nil {
+		errors.WriteError(r.Context(), w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// GetThumbnailURL handles GET /api/v1/videos/:id/thumbnail-url
+func (h *VideoHandler) GetThumbnailURL(w http.ResponseWriter, r *http.Request, videoID string) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		errors.WriteError(r.Context(), w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	resp, err := h.service.GetThumbnailURL(r.Context(), videoID)
+	if err != nil {
+		errors.WriteError(r.Context(), w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// ConfirmUpload handles POST /api/v1/videos/:id/confirm-upload
+func (h *VideoHandler) ConfirmUpload(w http.ResponseWriter, r *http.Request, videoID string) {
+	userID := middleware.GetUserID(r.Context())
+	userRole := middleware.GetUserRole(r.Context())
+	if userID == "" {
+		errors.WriteError(r.Context(), w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	// Only editors can confirm uploads
+	if userRole != "editor" {
+		errors.WriteError(r.Context(), w, errors.Forbidden("only editors can confirm uploads"))
+		return
+	}
+
+	// Parse request body
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		errors.WriteError(r.Context(), w, errors.BadRequest("invalid request body"))
+		return
+	}
+	defer r.Body.Close()
+
+	var req model.ConfirmUploadRequest
+	if err := json.Unmarshal(body, &req); err != nil {
+		errors.WriteError(r.Context(), w, errors.BadRequest("invalid JSON"))
+		return
+	}
+
+	// Validate required fields
+	if req.StorjKey == "" {
+		errors.WriteError(r.Context(), w, errors.BadRequest("storj_key is required"))
+		return
+	}
+	if req.FileSize <= 0 {
+		errors.WriteError(r.Context(), w, errors.BadRequest("file_size must be greater than 0"))
+		return
+	}
+	if req.Duration <= 0 {
+		errors.WriteError(r.Context(), w, errors.BadRequest("duration must be greater than 0"))
+		return
+	}
+
+	video, err := h.service.ConfirmUpload(r.Context(), userID, videoID, &req)
+	if err != nil {
+		errors.WriteError(r.Context(), w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(model.ConfirmUploadResponse{Video: video})
+}
+
+// DeleteVideo handles DELETE /api/v1/videos/:id/delete
+func (h *VideoHandler) DeleteVideo(w http.ResponseWriter, r *http.Request, videoID string) {
+	userID := middleware.GetUserID(r.Context())
+	if userID == "" {
+		errors.WriteError(r.Context(), w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	err := h.service.DeleteVideo(r.Context(), userID, videoID)
+	if err != nil {
+		errors.WriteError(r.Context(), w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
 }

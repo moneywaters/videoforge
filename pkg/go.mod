@@ -1,8 +1,12 @@
 module github.com/videoforge/backend/pkg
 
-go 1.22
+go 1.23
 
 require (
+	github.com/aws/aws-sdk-go-v2 v1.24.0
+	github.com/aws/aws-sdk-go-v2/config v1.26.0
+	github.com/aws/aws-sdk-go-v2/credentials v1.16.0
+	github.com/aws/aws-sdk-go-v2/service/s3 v1.47.0
 	github.com/golang-jwt/jwt/v5 v5.2.0
 	github.com/jackc/pgx/v5 v5.5.2
 	github.com/joho/godotenv v1.5.1

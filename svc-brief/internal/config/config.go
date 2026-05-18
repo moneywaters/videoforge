@@ -10,11 +10,12 @@ import (
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/joho/godotenv"
 	"github.com/kelseyhightower/envconfig"
+	"github.com/videoforge/backend/pkg/storage"
 )
 
 // ServerConfig holds server configuration
 type ServerConfig struct {
-	Port        string `envconfig:"PORT" default:"8080"`
+	Port         string `envconfig:"PORT" default:"8080"`
 	Environment string `envconfig:"ENVIRONMENT" default:"development"`
 }
 
@@ -22,6 +23,20 @@ type ServerConfig struct {
 type Config struct {
 	Server   ServerConfig
 	Database DatabaseConfig
+	Storage  StorageConfig
+}
+
+// StorageConfig holds S3-compatible storage configuration (Storj)
+type StorageConfig struct {
+	Enabled    bool
+	Client    storage.Storage
+	AccessKey string `envconfig:"STORJ_ACCESS_KEY"`
+	SecretKey string `envconfig:"STORJ_SECRET_KEY"`
+	Endpoint  string `envconfig:"STORJ_ENDPOINT" default:"https://gateway.storjshare.io"`
+	Region    string `envconfig:"STORJ_REGION" default:"us-east-1"`
+	Bucket    string `envconfig:"STORJ_BUCKET"`
+	// PublicURL is an optional public CDN URL prefix for thumbnails/public assets
+	PublicURL string `envconfig:"STORJ_PUBLIC_URL"`
 }
 
 // DatabaseConfig holds database configuration
@@ -63,10 +78,51 @@ func Load() (*Config, error) {
 
 	log.Println("Database pool created successfully")
 
+	// Load storage configuration
+	storageCfg := loadStorageConfig()
+
 	return &Config{
 		Server:   *cfg,
 		Database: DatabaseConfig{Pool: pool, URL: dbURL},
+		Storage:  storageCfg,
 	}, nil
+}
+
+// loadStorageConfig loads storage configuration from environment
+func loadStorageConfig() StorageConfig {
+	cfg := StorageConfig{}
+
+	// Try to load storage config
+	_ = envconfig.Process("storj", &cfg)
+
+	// Check if we have required credentials
+	if cfg.AccessKey != "" && cfg.SecretKey != "" && cfg.Bucket != "" {
+		cfg.Enabled = true
+
+		// Create storage client
+		storjConfig := storage.StorjConfig{
+			AccessKey: cfg.AccessKey,
+			SecretKey: cfg.SecretKey,
+			Endpoint:  cfg.Endpoint,
+			Region:    cfg.Region,
+			Bucket:    cfg.Bucket,
+			PublicURL: cfg.PublicURL,
+		}
+
+		client, err := storage.NewStorage(storjConfig)
+		if err != nil {
+			log.Printf("Warning: failed to create storage client: %v", err)
+			cfg.Enabled = false
+		} else {
+			cfg.Client = client
+			log.Println("Storage client initialized successfully")
+		}
+	} else {
+		log.Println("Storage credentials not configured, using mock storage")
+		cfg.Enabled = false
+	}
+
+	return cfg
 }
 
 // Close closes all resources

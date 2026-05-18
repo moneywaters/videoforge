@@ -15,6 +15,7 @@ import (
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/middleware"
+	"github.com/videoforge/backend/pkg/storage"
 
 	"svc-brief/internal/config"
 	"svc-brief/internal/handler"
@@ -44,8 +45,14 @@ func main() {
 	// Initialize repository
 	repo := repository.NewBriefRepo(cfg.Database.Pool)
 
+	// Get storage client if available
+	var storageClient storage.Storage
+	if cfg.Storage.Enabled && cfg.Storage.Client != nil {
+		storageClient = cfg.Storage.Client
+	}
+
 	// Initialize service
-	svc := service.NewBriefService(repo)
+	svc := service.NewBriefService(repo, storageClient)
 
 	// Initialize handler
 	briefHandler := handler.NewBriefHandler(svc)
@@ -74,6 +81,11 @@ func main() {
 	mux.HandleFunc("POST /api/v1/briefs/$/interview", briefHandler.HandleInterview)
 	mux.HandleFunc("GET /api/v1/briefs/matching", wrapAuth(authMiddleware, briefHandler.HandleMatchingBriefs))
 	mux.HandleFunc("POST /api/v1/briefs/$/view", wrapAuth(authMiddleware, briefHandler.HandleViewBrief))
+
+	// Raw footage endpoints
+	mux.HandleFunc("POST /api/v1/briefs/$/raw-footage/upload-url", wrapAuth(authMiddleware, briefHandler.HandleGetRawFootageUploadURL))
+	mux.HandleFunc("POST /api/v1/briefs/$/raw-footage/confirm", wrapAuth(authMiddleware, briefHandler.HandleConfirmRawFootageUpload))
+	mux.HandleFunc("GET /api/v1/briefs/$/raw-footage/download-url", wrapAuth(authMiddleware, briefHandler.HandleGetRawFootageDownloadURL))
 
 	// Add middleware chain
 	chain := middleware.Chain(

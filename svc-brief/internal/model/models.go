@@ -15,20 +15,24 @@ const (
 
 // Brief represents a video brief
 type Brief struct {
-	ID               uuid.UUID  `json:"id"`
-	ClientID         uuid.UUID  `json:"client_id"`
-	Title            string    `json:"title"`
-	Description     string    `json:"description"`
-	Goals            string    `json:"goals"`
+	ID                uuid.UUID  `json:"id"`
+	ClientID          uuid.UUID  `json:"client_id"`
+	Title             string    `json:"title"`
+	Description      string    `json:"description"`
+	Goals             string    `json:"goals"`
 	TargetAudience   string    `json:"target_audience"`
-	Tone             string    `json:"tone"`
-	StylePreferences string    `json:"style_preferences"`
-	CTA              string    `json:"cta"`
-	Status           string    `json:"status"`
-	BountyBudget     float64   `json:"bounty_budget"`
-	BountyDeposited  bool      `json:"bounty_deposited"`
-	SubmissionsLimit int       `json:"submissions_limit"`
-	IsBlind          bool      `json:"is_blind"`
+	Tone              string    `json:"tone"`
+	StylePreferences  string    `json:"style_preferences"`
+	CTA               string    `json:"cta"`
+	Status            string    `json:"status"`
+	BountyBudget      float64   `json:"bounty_budget"`
+	BountyDeposited bool      `json:"bounty_deposited"`
+	SubmissionsLimit  int       `json:"submissions_limit"`
+	IsBlind           bool      `json:"is_blind"`
+	// Raw footage storage
+	RawFootageStorjKey string    `json:"raw_footage_storj_key,omitempty"`
+	RawFootageURL     string    `json:"raw_footage_url,omitempty"`
+	HasRawFootage    bool      `json:"has_raw_footage"`
 	Tags             []string  `json:"tags,omitempty"`
 	CreatedAt        time.Time `json:"created_at"`
 	UpdatedAt        time.Time `json:"updated_at"`
@@ -89,7 +93,7 @@ type UpdateBriefRequest struct {
 
 // BriefResponse represents a brief response
 type BriefResponse struct {
-	ID               uuid.UUID `json:"id"`
+	ID                uuid.UUID `json:"id"`
 	ClientID         uuid.UUID `json:"client_id"`
 	Title            string    `json:"title"`
 	Description     string    `json:"description"`
@@ -100,12 +104,14 @@ type BriefResponse struct {
 	CTA              string    `json:"cta"`
 	Status           string    `json:"status"`
 	BountyBudget     float64   `json:"bounty_budget"`
-	BountyDeposited  bool      `json:"bounty_deposited"`
-	SubmissionsLimit int       `json:"submissions_limit"`
-	IsBlind          bool      `json:"is_blind"`
-	Tags             []string  `json:"tags"`
-	CreatedAt        time.Time `json:"created_at"`
-	UpdatedAt        time.Time `json:"updated_at"`
+	BountyDeposited bool      `json:"bounty_deposited"`
+	SubmissionsLimit int     `json:"submissions_limit"`
+	IsBlind          bool     `json:"is_blind"`
+	// Raw footage
+	HasRawFootage bool   `json:"has_raw_footage"`
+	Tags          []string `json:"tags"`
+	CreatedAt    time.Time `json:"created_at"`
+	UpdatedAt   time.Time `json:"updated_at"`
 }
 
 // ToResponse converts a Brief to BriefResponse
@@ -116,7 +122,7 @@ func (b *Brief) ToResponse() BriefResponse {
 		Title:            b.Title,
 		Description:      b.Description,
 		Goals:            b.Goals,
-		TargetAudience:   b.TargetAudience,
+		TargetAudience:  b.TargetAudience,
 		Tone:             b.Tone,
 		StylePreferences: b.StylePreferences,
 		CTA:              b.CTA,
@@ -125,6 +131,7 @@ func (b *Brief) ToResponse() BriefResponse {
 		BountyDeposited:  b.BountyDeposited,
 		SubmissionsLimit: b.SubmissionsLimit,
 		IsBlind:          b.IsBlind,
+		HasRawFootage:    b.HasRawFootage,
 		Tags:             b.Tags,
 		CreatedAt:        b.CreatedAt,
 		UpdatedAt:        b.UpdatedAt,
@@ -173,4 +180,28 @@ type ViewBriefRequest struct {
 // MatchingBriefsRequest represents a request to find matching briefs
 type MatchingBriefsRequest struct {
 	EditorTags []string `json:"editor_tags"`
+}
+
+// UploadRawFootageRequest represents a request to get upload URL for raw footage
+type UploadRawFootageRequest struct {
+	BriefID   string `json:"brief_id"`
+	Filename string `json:"filename"` // e.g., "raw_footage.zip"
+}
+
+// UploadRawFootageResponse represents response with presigned upload URL
+type UploadRawFootageResponse struct {
+	UploadURL string `json:"upload_url"`
+	StorjKey  string `json:"storj_key"`
+	ExpiresIn int    `json:"expires_in"` // seconds
+}
+
+// ConfirmRawFootageUploadRequest represents a request to confirm upload complete
+type ConfirmRawFootageUploadRequest struct {
+	StorjKey string `json:"storj_key"`
+}
+
+// RawFootageDownloadURLResponse represents response with download URL
+type RawFootageDownloadURLResponse struct {
+	DownloadURL string `json:"download_url"`
+	ExpiresIn   int    `json:"expires_in"` // seconds
 }

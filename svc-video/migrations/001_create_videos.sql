@@ -10,6 +10,8 @@ CREATE TABLE IF NOT EXISTS video.videos (
     title VARCHAR(512) NOT NULL,
     description TEXT,
     storj_key VARCHAR(1024),
+    thumbnail_storj_key VARCHAR(1024),
+    file_size BIGINT DEFAULT 0,
     status VARCHAR(32) DEFAULT 'draft' CHECK (status IN ('draft', 'submitted', 'approved', 'rejected', 'revision_requested')),
     current_revision_id UUID,
     duration INTEGER DEFAULT 0,

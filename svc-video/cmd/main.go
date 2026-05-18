@@ -73,8 +73,13 @@ func main() {
 	// Initialize repository
 	repo := repository.NewVideoRepository(configuration.Database.Pool)
 
-	// Initialize service
-	svc := service.NewVideoService(repo, nc, log)
+	// Initialize service with storage (if configured)
+	// If no storage credentials, storageClient will be nil and mock storage will be used
+	var storageClient interface{} = nil
+	if configuration.Storage.Enabled && configuration.Storage.Client != nil {
+		storageClient = configuration.Storage.Client
+	}
+	svc := service.NewVideoService(repo, nc, log, storageClient)
 
 	// Initialize handler
 	videoHandler := handler.NewVideoHandler(svc, log)

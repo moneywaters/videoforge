@@ -125,6 +125,15 @@ tidy:
 	$(GO) mod tidy
 	cd pkg && $(GO) mod tidy
 
+# Setup local development environment
+.PHONY: dev-setup
+dev-setup:
+	@echo "Setting up development environment..."
+	@cp -n .env.example .env 2>/dev/null || true
+	@docker-compose up -d
+	@echo "Development environment ready."
+	@echo "Copy .env.example to .env and configure if needed."
+
 # Show help
 .PHONY: help
 help:
@@ -148,4 +157,5 @@ help:
 	@echo "  clean         - Clean build artifacts"
 	@echo "  deps          - Install dependencies"
 	@echo "  tidy          - Tidy dependencies"
+	@echo "  dev-setup     - Setup local development environment"
 	@echo "  help          - Show this help"

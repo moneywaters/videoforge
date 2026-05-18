@@ -11,6 +11,7 @@ import (
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/natsclient"
+	"github.com/videoforge/backend/pkg/storage"
 	"github.com/videoforge/backend/svc-video/internal/model"
 	"github.com/videoforge/backend/svc-video/internal/repository"
 )
@@ -21,6 +22,9 @@ type VideoService interface {
 	GetVideo(ctx context.Context, userID, userRole, videoID string, briefClientID string) (*model.Video, error)
 	ListVideos(ctx context.Context, userID, userRole, briefClientID string, briefID, editorID, status string, page, pageSize int) ([]*model.Video, int, error)
 	GetUploadURL(ctx context.Context, videoID string) (*model.UploadURLResponse, error)
+	GetDownloadURL(ctx context.Context, videoID string) (*model.DownloadURLResponse, error)
+	GetThumbnailURL(ctx context.Context, videoID string) (*model.ThumbnailURLResponse, error)
+	ConfirmUpload(ctx context.Context, userID, videoID string, req *model.ConfirmUploadRequest) (*model.Video, error)
 	SubmitVideo(ctx context.Context, userID, videoID string, storjKey string, duration int, resolution, thumbnail string) (*model.Video, error)
 	ApproveVideo(ctx context.Context, userID, briefClientID, videoID, notes string) (*model.Video, error)
 	RejectVideo(ctx context.Context, userID, briefClientID, videoID, feedback string) (*model.Video, error)
@@ -28,20 +32,30 @@ type VideoService interface {
 	CreateRevision(ctx context.Context, userID, videoID, storjKey, changelog string) (*model.VideoRevision, error)
 	GetRevisions(ctx context.Context, userID, userRole, videoID string, briefClientID string) ([]*model.VideoRevision, error)
 	GetFeedback(ctx context.Context, videoID string) ([]*model.VideoFeedback, error)
+	DeleteVideo(ctx context.Context, userID, videoID string) error
 }
 
 type videoService struct {
-	repo      repository.VideoRepository
-	natsClient natsclient.NATSClient
-	log       *logger.Logger
+	repo        repository.VideoRepository
+	natsClient  natsclient.NATSClient
+	log         *logger.Logger
+	storage     storage.Storage // nil means mock storage (for dev/testing)
 }
 
 // NewVideoService creates a new video service
-func NewVideoService(repo repository.VideoRepository, nc natsclient.NATSClient, log *logger.Logger) VideoService {
+// If storageClient is nil, mock storage will be used (for development/testing)
+func NewVideoService(repo repository.VideoRepository, nc natsclient.NATSClient, log *logger.Logger, storageClient interface{}) VideoService {
+	var storage storage.Storage
+	if storageClient != nil {
+		if s, ok := storageClient.(storage.Storage); ok {
+			storage = s
+		}
+	}
 	return &videoService{
 		repo:      repo,
 		natsClient: nc,
 		log:       log,
+		storage:    storage,
 	}
 }
 
@@ -133,7 +147,11 @@ func (s *videoService) ListVideos(ctx context.Context, userID, userRole, briefCl
 	return s.repo.List(ctx, briefID, editorID, status, page, pageSize)
 }
 
-// GetUploadURL generates a mock presigned URL for upload (STUB)
+// defaultPresignExpiry is the default expiry for presigned URLs
+const defaultPresignExpiry = 15 * time.Minute
+
+// GetUploadURL generates a presigned URL for upload
+// Uses real Storj storage if configured, otherwise mock for dev/testing
 func (s *videoService) GetUploadURL(ctx context.Context, videoID string) (*model.UploadURLResponse, error) {
 	video, err := s.repo.GetByID(ctx, videoID)
 	if err != nil {
@@ -143,14 +161,221 @@ func (s *videoService) GetUploadURL(ctx context.Context, videoID string) (*model
 		return nil, errors.NotFound("video not found")
 	}
 
-	// Stub: generate mock presigned URL (in production, call Storj API)
-	mockURL := fmt.Sprintf("https://link.storj.io/broadcast/%s/mock-presigned-url-%s", videoID, time.Now().Unix())
-	storjKey := fmt.Sprintf("videos/%s/%s.mp4", video.ID, uuid.New().String())
+	// Generate unique Storj key for this upload
+	storjKey := fmt.Sprintf("videos/%s/raw.%s", videoID, "mp4")
+
+	var uploadURL string
+	if s.storage != nil {
+		// Use real Storj storage
+		uploadURL, err = s.storage.GeneratePresignedUploadURL(ctx, storjKey, defaultPresignExpiry)
+		if err != nil {
+			return nil, errors.Internal(fmt.Sprintf("failed to generate presigned upload URL: %v", err))
+		}
+	} else {
+		// Mock storage for development/testing
+		uploadURL = fmt.Sprintf("https://link.storj.io/broadcast/%s/mock-presigned-url-%s", videoID, time.Now().Unix())
+	}
 
 	return &model.UploadURLResponse{
-		UploadURL: mockURL,
-		StorjKey: storjKey,
+		UploadURL: uploadURL,
+		StorjKey:  storjKey,
+		ExpiresIn:  int(defaultPresignExpiry.Seconds()),
 	}, nil
+}
+
+// GetDownloadURL generates a presigned URL for download
+func (s *videoService) GetDownloadURL(ctx context.Context, videoID string) (*model.DownloadURLResponse, error) {
+	video, err := s.repo.GetByID(ctx, videoID)
+	if err != nil {
+		return nil, errors.Internal("failed to get video")
+	}
+	if video == nil {
+		return nil, errors.NotFound("video not found")
+	}
+
+	if video.StorjKey == "" {
+		return nil, errors.NotFound("video has not been uploaded")
+	}
+
+	var downloadURL string
+	if s.storage != nil {
+		// Use real Storj storage
+		downloadURL, err = s.storage.GeneratePresignedDownloadURL(ctx, video.StorjKey, defaultPresignExpiry)
+		if err != nil {
+			return nil, errors.Internal(fmt.Sprintf("failed to generate presigned download URL: %v", err))
+		}
+	} else {
+		// Mock storage for development/testing
+		downloadURL = fmt.Sprintf("https://link.storj.io/broadcast/%s/mock-download-url-%s", videoID, time.Now().Unix())
+	}
+
+	return &model.DownloadURLResponse{
+		DownloadURL: downloadURL,
+		StorjKey:   video.StorjKey,
+		ExpiresIn:  int(defaultPresignExpiry.Seconds()),
+	}, nil
+}
+
+// GetThumbnailURL generates a URL for thumbnail access
+func (s *videoService) GetThumbnailURL(ctx context.Context, videoID string) (*model.ThumbnailURLResponse, error) {
+	video, err := s.repo.GetByID(ctx, videoID)
+	if err != nil {
+		return nil, errors.Internal("failed to get video")
+	}
+	if video == nil {
+		return nil, errors.NotFound("video not found")
+	}
+
+	// If thumbnail storj key is set, generate presigned URL
+	if video.ThumbnailStorjKey != "" && s.storage != nil {
+		thumbnailURL, err := s.storage.GeneratePresignedDownloadURL(ctx, video.ThumbnailStorjKey, defaultPresignExpiry)
+		if err != nil {
+			return nil, errors.Internal(fmt.Sprintf("failed to generate thumbnail URL: %v", err))
+		}
+		return &model.ThumbnailURLResponse{
+			ThumbnailURL:       thumbnailURL,
+			ThumbnailStorjKey: video.ThumbnailStorjKey,
+			ExpiresIn:          int(defaultPresignExpiry.Seconds()),
+		}, nil
+	}
+
+	// Fallback to mock URL or use ThumbnailURL field
+	thumbnailURL := video.ThumbnailURL
+	if thumbnailURL == "" {
+		thumbnailURL = fmt.Sprintf("https://link.storj.io/broadcast/%s/mock-thumbnail-%s.png", videoID, time.Now().Unix())
+	}
+
+	return &model.ThumbnailURLResponse{
+		ThumbnailURL:       thumbnailURL,
+		ThumbnailStorjKey: video.ThumbnailStorjKey,
+		ExpiresIn:          int(defaultPresignExpiry.Seconds()),
+	}, nil
+}
+
+// ConfirmUpload confirms that an upload is complete and updates the video record
+func (s *videoService) ConfirmUpload(ctx context.Context, userID, videoID string, req *model.ConfirmUploadRequest) (*model.Video, error) {
+	video, err := s.repo.GetByID(ctx, videoID)
+	if err != nil {
+		return nil, errors.Internal("failed to get video")
+	}
+	if video == nil {
+		return nil, errors.NotFound("video not found")
+	}
+
+	// Only the editor who created the video can confirm upload
+	if video.EditorID != userID {
+		return nil, errors.Forbidden("only the editor who created this video can confirm upload")
+	}
+
+	// Verify the object exists in storage
+	if s.storage != nil {
+		exists, err := s.storage.ObjectExists(ctx, req.StorjKey)
+		if err != nil {
+			return nil, errors.Internal(fmt.Sprintf("failed to verify object exists: %v", err))
+		}
+		if !exists {
+			return nil, errors.NotFound("uploaded video not found in storage")
+		}
+	}
+
+	// Update video record with upload details
+	now := time.Now()
+	video.StorjKey = req.StorjKey
+	video.FileSize = req.FileSize
+	video.Duration = req.Duration
+	video.Resolution = req.Resolution
+	video.Status = model.StatusSubmitted
+	video.SubmittedAt = &now
+	video.UpdatedAt = now
+
+	if video.ThumbnailStorjKey == "" {
+		// Generate placeholder thumbnail key (actual thumbnail generation would be async)
+		video.ThumbnailStorjKey = fmt.Sprintf("thumbnails/%s/thumbnail.jpg", videoID)
+	}
+
+	if err := s.repo.Update(ctx, video); err != nil {
+		return nil, errors.Internal("failed to confirm upload")
+	}
+
+	// Emit event to NATS
+	if s.natsClient != nil {
+		event := map[string]interface{}{
+			"event":      "video.upload_confirmed",
+			"video_id":  video.ID,
+			"brief_id":  video.BriefID,
+			"editor_id": video.EditorID,
+			"file_size": req.FileSize,
+			"duration":  req.Duration,
+			"timestamp": now,
+		}
+		if data, err := json.Marshal(event); err == nil {
+			s.natsClient.Publish("video.upload_confirmed", data)
+		}
+	}
+
+	return video, nil
+}
+
+// DeleteVideo deletes a video and its associated storage objects
+func (s *videoService) DeleteVideo(ctx context.Context, userID, videoID string) error {
+	video, err := s.repo.GetByID(ctx, videoID)
+	if err != nil {
+		return errors.Internal("failed to get video")
+	}
+	if video == nil {
+		return errors.NotFound("video not found")
+	}
+
+	// Only the editor who created the video can delete it
+	if video.EditorID != userID {
+		return errors.Forbidden("only the editor who created this video can delete it")
+	}
+
+	// Can only delete draft videos
+	if video.Status != model.StatusDraft {
+		return errors.BadRequest("can only delete draft videos")
+	}
+
+	// Delete storage objects if they exist
+	if s.storage != nil {
+		if video.StorjKey != "" {
+			if err := s.storage.DeleteObject(ctx, video.StorjKey); err != nil {
+				s.log.Error("failed to delete video from storage",
+					slog.String("error", err.Error()),
+					slog.String("storj_key", video.StorjKey))
+				// Continue with database deletion even if storage deletion fails
+			}
+		}
+		if video.ThumbnailStorjKey != "" {
+			if err := s.storage.DeleteObject(ctx, video.ThumbnailStorjKey); err != nil {
+				s.log.Error("failed to delete thumbnail from storage",
+					slog.String("error", err.Error()),
+					slog.String("storj_key", video.ThumbnailStorjKey))
+			}
+		}
+	}
+
+	// Delete from database
+	if err := s.repo.Delete(ctx, videoID); err != nil {
+		return errors.Internal("failed to delete video")
+	}
+
+	// Emit event to NATS
+	if s.natsClient != nil {
+		now := time.Now()
+		event := map[string]interface{}{
+			"event":     "video.deleted",
+			"video_id": video.ID,
+			"brief_id": video.BriefID,
+			"editor_id": video.EditorID,
+			"timestamp": now,
+		}
+		if data, err := json.Marshal(event); err == nil {
+			s.natsClient.Publish("video.deleted", data)
+		}
+	}
+
+	return nil
 }
 
 // SubmitVideo submits a video for approval

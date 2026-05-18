@@ -15,20 +15,22 @@ const (
 
 // Video represents a video submission for a brief
 type Video struct {
-	ID                string     `json:"id"`
-	BriefID          string     `json:"brief_id"`
-	EditorID         string     `json:"editor_id"`
-	Title           string     `json:"title"`
-	Description     string     `json:"description,omitempty"`
-	StorjKey        string     `json:"storj_key,omitempty"`
-	Status          VideoStatus `json:"status"`
-	CurrentRevisionID string     `json:"current_revision_id,omitempty"`
-	Duration        int        `json:"duration"`
-	Resolution      string     `json:"resolution"`
-	ThumbnailURL    string     `json:"thumbnail_url,omitempty"`
-	SubmittedAt     *time.Time `json:"submitted_at,omitempty"`
-	CreatedAt        time.Time  `json:"created_at"`
-	UpdatedAt       time.Time  `json:"updated_at"`
+	ID                 string     `json:"id"`
+	BriefID            string     `json:"brief_id"`
+	EditorID           string     `json:"editor_id"`
+	Title              string     `json:"title"`
+	Description        string     `json:"description,omitempty"`
+	StorjKey           string     `json:"storj_key,omitempty"`
+	ThumbnailStorjKey  string     `json:"thumbnail_storj_key,omitempty"`
+	FileSize           int64      `json:"file_size,omitempty"`
+	Status             VideoStatus `json:"status"`
+	CurrentRevisionID  string     `json:"current_revision_id,omitempty"`
+	Duration          int        `json:"duration"`
+	Resolution        string     `json:"resolution"`
+	ThumbnailURL      string     `json:"thumbnail_url,omitempty"`
+	SubmittedAt        *time.Time `json:"submitted_at,omitempty"`
+	CreatedAt         time.Time  `json:"created_at"`
+	UpdatedAt         time.Time  `json:"updated_at"`
 }
 
 // VideoRevision represents a revision of a video
@@ -99,8 +101,36 @@ type ListVideosResponse struct {
 
 // UploadURLResponse represents the response for getting an upload URL
 type UploadURLResponse struct {
-	UploadURL string `json:"upload_url"`
+	UploadURL  string `json:"upload_url"`
 	StorjKey  string `json:"storj_key"`
+	ExpiresIn int    `json:"expires_in"`
+}
+
+// DownloadURLResponse represents the response for getting a download URL
+type DownloadURLResponse struct {
+	DownloadURL string `json:"download_url"`
+	StorjKey   string `json:"storj_key,omitempty"`
+	ExpiresIn  int    `json:"expires_in"`
+}
+
+// ThumbnailURLResponse represents the response for getting a thumbnail URL
+type ThumbnailURLResponse struct {
+	ThumbnailURL       string `json:"thumbnail_url"`
+	ThumbnailStorjKey string `json:"thumbnail_storj_key,omitempty"`
+	ExpiresIn        int    `json:"expires_in"`
+}
+
+// ConfirmUploadRequest represents the request to confirm an upload is complete
+type ConfirmUploadRequest struct {
+	StorjKey   string `json:"storj_key"`
+	FileSize   int64  `json:"file_size"`
+	Duration  int    `json:"duration"`
+	Resolution string `json:"resolution"`
+}
+
+// ConfirmUploadResponse represents the response after confirming an upload
+type ConfirmUploadResponse struct {
+	Video *Video `json:"video"`
 }
 
 // SubmitVideoRequest represents the request to submit a video

@@ -11,6 +11,7 @@ import (
 	"svc-brief/internal/repository"
 
 	"github.com/videoforge/backend/pkg/errors"
+	"github.com/videoforge/backend/pkg/storage"
 )
 
 var (
@@ -18,11 +19,14 @@ var (
 	ErrCannotPublishClosed  = errors.BadRequest("cannot publish closed brief")
 	ErrBountyNotDeposited     = errors.BadRequest("bounty must be deposited before publishing")
 	ErrInterviewNoBrief      = errors.BadRequest("no brief found for interview")
+	ErrNoStorageClient       = errors.BadRequest("storage not configured")
+	ErrNoRawFootage          = errors.BadRequest("no raw footage uploaded")
 )
 
 // BriefService handles brief business logic
 type BriefService struct {
-	repo repository.BriefRepoInterface
+	repo    repository.BriefRepoInterface
+	storage storage.Storage
 }
 
 // BriefServiceInterface defines the brief service interface
@@ -37,11 +41,16 @@ type BriefServiceInterface interface {
 	Interview(ctx context.Context, briefID uuid.UUID, req model.InterviewRequest) (model.InterviewResponse, error)
 	GetMatchingBriefs(ctx context.Context, tags []string, page, limit int) (*model.ListBriefsResponse, error)
 	MarkBriefViewed(ctx context.Context, briefID uuid.UUID, req model.ViewBriefRequest) error
+
+	// Raw footage
+	GetRawFootageUploadURL(ctx context.Context, userID, briefID uuid.UUID, filename string) (*model.UploadRawFootageResponse, error)
+	ConfirmRawFootageUpload(ctx context.Context, userID, briefID uuid.UUID, storjKey string) error
+	GetRawFootageDownloadURL(ctx context.Context, userID, briefID uuid.UUID) (*model.RawFootageDownloadURLResponse, error)
 }
 
 // NewBriefService creates a new BriefService
-func NewBriefService(repo repository.BriefRepoInterface) *BriefService {
-	return &BriefService{repo: repo}
+func NewBriefService(repo repository.BriefRepoInterface, storageClient storage.Storage) *BriefService {
+	return &BriefService{repo: repo, storage: storageClient}
 }
 
 // CreateBrief creates a new brief
@@ -465,4 +474,143 @@ func (s *BriefService) MarkBriefViewed(ctx context.Context, briefID uuid.UUID, r
 	}
 
 	return nil
+}
+
+// GetRawFootageUploadURL generates a presigned upload URL for raw footage
+func (s *BriefService) GetRawFootageUploadURL(ctx context.Context, userID, briefID uuid.UUID, filename string) (*model.UploadRawFootageResponse, error) {
+	// Verify storage is available
+	if s.storage == nil {
+		return nil, ErrNoStorageClient
+	}
+
+	// Get brief and verify ownership
+	brief, err := s.repo.GetBriefByID(ctx, briefID)
+	if err != nil {
+		if err == repository.ErrBriefNotFound {
+			return nil, errors.NotFound("brief not found")
+		}
+		return nil, fmt.Errorf("failed to get brief: %w", err)
+	}
+
+	// Only the brief owner (client) can upload raw footage
+	if brief.ClientID != userID {
+		return nil, errors.Forbidden("not authorized to upload raw footage for this brief")
+	}
+
+	// Validate filename
+	if filename == "" {
+		return nil, errors.BadRequest("filename is required")
+	}
+
+	// Generate Storj key: briefs/{briefID}/raw_footage/{filename}
+	storjKey := fmt.Sprintf("briefs/%s/raw_footage/%s", briefID.String(), filename)
+
+	// Generate presigned upload URL
+	uploadURL, expiresIn, err := s.storage.GeneratePresignedUploadURL(ctx, storjKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate upload URL: %w", err)
+	}
+
+	return &model.UploadRawFootageResponse{
+		UploadURL: uploadURL,
+		StorjKey:  storjKey,
+		ExpiresIn: expiresIn,
+	}, nil
+}
+
+// ConfirmRawFootageUpload confirms raw footage upload is complete
+func (s *BriefService) ConfirmRawFootageUpload(ctx context.Context, userID, briefID uuid.UUID, storjKey string) error {
+	// Verify storage is available
+	if s.storage == nil {
+		return ErrNoStorageClient
+	}
+
+	// Get brief and verify ownership
+	brief, err := s.repo.GetBriefByID(ctx, briefID)
+	if err != nil {
+		if err == repository.ErrBriefNotFound {
+			return errors.NotFound("brief not found")
+		}
+		return fmt.Errorf("failed to get brief: %w", err)
+	}
+
+	// Only the brief owner (client) can confirm upload
+	if brief.ClientID != userID {
+		return errors.Forbidden("not authorized to confirm upload for this brief")
+	}
+
+	// Validate storj key
+	if storjKey == "" {
+		return errors.BadRequest("storj_key is required")
+	}
+
+	// Verify the file exists in storage
+	exists, err := s.storage.FileExists(ctx, storjKey)
+	if err != nil {
+		return fmt.Errorf("failed to verify file: %w", err)
+	}
+	if !exists {
+		return errors.BadRequest("file not found in storage")
+	}
+
+	// Update brief with raw footage info
+	if err := s.repo.UpdateRawFootage(ctx, briefID, storjKey); err != nil {
+		return fmt.Errorf("failed to update brief: %w", err)
+	}
+
+	return nil
+}
+
+// GetRawFootageDownloadURL generates a presigned download URL for raw footage
+func (s *BriefService) GetRawFootageDownloadURL(ctx context.Context, userID, briefID uuid.UUID) (*model.RawFootageDownloadURLResponse, error) {
+	// Verify storage is available
+	if s.storage == nil {
+		return nil, ErrNoStorageClient
+	}
+
+	// Get brief
+	brief, err := s.repo.GetBriefByID(ctx, briefID)
+	if err != nil {
+		if err == repository.ErrBriefNotFound {
+			return nil, errors.NotFound("brief not found")
+		}
+		return nil, fmt.Errorf("failed to get brief: %w", err)
+	}
+
+	// Check if raw footage exists
+	if !brief.HasRawFootage || brief.RawFootageStorjKey == "" {
+		return nil, ErrNoRawFootage
+	}
+
+	// Only the brief owner (client) or matched editors can download
+	isOwner := brief.ClientID == userID
+	isEditorMatched := false
+
+	if !isOwner {
+		// Check if user has viewed the brief (indicating they're a matched editor)
+		viewers, err := s.repo.GetBriefViewers(ctx, briefID)
+		if err == nil {
+			for _, viewerID := range viewers {
+				if viewerID == userID {
+					isEditorMatched = true
+					break
+				}
+			}
+		}
+	}
+
+	if !isOwner && !isEditorMatched {
+		return nil, errors.Forbidden("not authorized to download raw footage for this brief")
+	}
+
+	// Generate presigned download URL
+	downloadURL, expiresIn, err := s.storage.GeneratePresignedDownloadURL(ctx, brief.RawFootageStorjKey)
+	if err != nil {
+		return nil, fmt.Errorf("failed to generate download URL: %w", err)
+	}
+
+	return &model.RawFootageDownloadURLResponse{
+		DownloadURL: downloadURL,
+		ExpiresIn:   expiresIn,
+	}, nil
 }

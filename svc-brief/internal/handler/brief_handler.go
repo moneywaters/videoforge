@@ -387,6 +387,142 @@ func (h *BriefHandler) HandleViewBrief(w http.ResponseWriter, r *http.Request) {
 	w.WriteHeader(http.StatusNoContent)
 }
 
+// HandleGetRawFootageUploadURL handles POST /api/v1/briefs/:id/raw-footage/upload-url
+func (h *BriefHandler) HandleGetRawFootageUploadURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
+		errors.WriteError(ctx, w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid user ID"))
+		return
+	}
+
+	// Extract brief ID from path
+	idStr := extractPathVar(r, "id")
+	if idStr == "" {
+		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
+		return
+	}
+
+	briefID, err := uuid.Parse(idStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid brief ID"))
+		return
+	}
+
+	// Parse request body
+	var req model.UploadRawFootageRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid request body"))
+		return
+	}
+
+	// Get upload URL
+	resp, err := h.service.GetRawFootageUploadURL(ctx, userID, briefID, req.Filename)
+	if err != nil {
+		errors.WriteError(ctx, w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
+// HandleConfirmRawFootageUpload handles POST /api/v1/briefs/:id/raw-footage/confirm
+func (h *BriefHandler) HandleConfirmRawFootageUpload(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
+		errors.WriteError(ctx, w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid user ID"))
+		return
+	}
+
+	// Extract brief ID from path
+	idStr := extractPathVar(r, "id")
+	if idStr == "" {
+		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
+		return
+	}
+
+	briefID, err := uuid.Parse(idStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid brief ID"))
+		return
+	}
+
+	// Parse request body
+	var req model.ConfirmRawFootageUploadRequest
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid request body"))
+		return
+	}
+
+	// Confirm upload
+	if err := h.service.ConfirmRawFootageUpload(ctx, userID, briefID, req.StorjKey); err != nil {
+		errors.WriteError(ctx, w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	w.WriteHeader(http.StatusNoContent)
+}
+
+// HandleGetRawFootageDownloadURL handles GET /api/v1/briefs/:id/raw-footage/download-url
+func (h *BriefHandler) HandleGetRawFootageDownloadURL(w http.ResponseWriter, r *http.Request) {
+	ctx := r.Context()
+
+	// Get user ID from context
+	userIDStr := middleware.GetUserID(ctx)
+	if userIDStr == "" {
+		errors.WriteError(ctx, w, errors.Unauthorized("user not authenticated"))
+		return
+	}
+
+	userID, err := uuid.Parse(userIDStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid user ID"))
+		return
+	}
+
+	// Extract brief ID from path
+	idStr := extractPathVar(r, "id")
+	if idStr == "" {
+		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
+		return
+	}
+
+	briefID, err := uuid.Parse(idStr)
+	if err != nil {
+		errors.WriteError(ctx, w, errors.BadRequest("invalid brief ID"))
+		return
+	}
+
+	// Get download URL
+	resp, err := h.service.GetRawFootageDownloadURL(ctx, userID, briefID)
+	if err != nil {
+		errors.WriteError(ctx, w, err)
+		return
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(resp)
+}
+
 // Helper functions
 
 func extractPathVar(r *http.Request, key string) string {

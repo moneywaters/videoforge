@@ -44,6 +44,8 @@ type BriefRepoInterface interface {
 	HasViewedBrief(ctx context.Context, briefID, editorID uuid.UUID) (bool, error)
 
 	GetMatchingBriefs(ctx context.Context, tags []string, page, limit int) (*model.ListBriefsResponse, error)
+
+	UpdateRawFootage(ctx context.Context, briefID uuid.UUID, storjKey string) error
 }
 
 // NewBriefRepo creates a new BriefRepo
@@ -61,9 +63,9 @@ func (r *BriefRepo) CreateBrief(ctx context.Context, brief *model.Brief) error {
 		INSERT INTO brief.briefs (
 			id, client_id, title, description, goals, target_audience,
 			tone, style_preferences, cta, status, bounty_budget, bounty_deposited,
-			submissions_limit, is_blind, created_at, updated_at
+			submissions_limit, is_blind, raw_footage_storj_key, has_raw_footage, created_at, updated_at
 		) VALUES (
-			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16
+			$1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15, $16, $17, $18
 		)
 	`
 
@@ -82,6 +84,8 @@ func (r *BriefRepo) CreateBrief(ctx context.Context, brief *model.Brief) error {
 		brief.BountyDeposited,
 		brief.SubmissionsLimit,
 		brief.IsBlind,
+		brief.RawFootageStorjKey,
+		brief.HasRawFootage,
 		brief.CreatedAt,
 		brief.UpdatedAt,
 	)
@@ -104,7 +108,7 @@ func (r *BriefRepo) GetBriefByID(ctx context.Context, id uuid.UUID) (*model.Brie
 	query := `
 		SELECT id, client_id, title, description, goals, target_audience,
 			tone, style_preferences, cta, status, bounty_budget, bounty_deposited,
-			submissions_limit, is_blind, created_at, updated_at
+			submissions_limit, is_blind, raw_footage_storj_key, has_raw_footage, created_at, updated_at
 		FROM brief.briefs
 		WHERE id = $1
 	`
@@ -125,6 +129,8 @@ func (r *BriefRepo) GetBriefByID(ctx context.Context, id uuid.UUID) (*model.Brie
 		&brief.BountyDeposited,
 		&brief.SubmissionsLimit,
 		&brief.IsBlind,
+		&brief.RawFootageStorjKey,
+		&brief.HasRawFootage,
 		&brief.CreatedAt,
 		&brief.UpdatedAt,
 	)
@@ -580,4 +586,26 @@ func (r *BriefRepo) GetMatchingBriefs(ctx context.Context, tags []string, page, 
 	// Only return published briefs
 	status := model.BriefStatusPublished
 	return r.ListBriefs(ctx, nil, &status, tags, page, limit)
+}
+
+// UpdateRawFootage updates brief with raw footage info
+func (r *BriefRepo) UpdateRawFootage(ctx context.Context, briefID uuid.UUID, storjKey string) error {
+	query := `
+		UPDATE brief.briefs SET
+			raw_footage_storj_key = $2,
+			has_raw_footage = TRUE,
+			updated_at = NOW()
+		WHERE id = $1
+	`
+
+	result, err := r.db.Exec(ctx, query, briefID, storjKey)
+	if err != nil {
+		return fmt.Errorf("failed to update raw footage: %w", err)
+	}
+
+	if result.RowsAffected() == 0 {
+		return ErrBriefNotFound
+	}
+
+	return nil
 }

@@ -3,6 +3,7 @@ package repository
 import (
 	"context"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -49,12 +50,14 @@ func (r *videoRepo) Create(ctx context.Context, v *model.Video) error {
 	query := `
 		INSERT INTO video.videos (
 			id, brief_id, editor_id, title, description, storj_key,
+			thumbnail_storj_key, file_size,
 			status, current_revision_id, duration, resolution, thumbnail_url,
 			created_at, updated_at
 		) VALUES (
 			$1, $2, $3, $4, $5, $6,
-			$7, $8, $9, $10, $11,
-			$12, $13
+			$7, $8,
+			$9, $10, $11, $12, $13,
+			$14, $15
 		)`
 
 	now := getCurrentTime()
@@ -65,6 +68,8 @@ func (r *videoRepo) Create(ctx context.Context, v *model.Video) error {
 		v.Title,
 		v.Description,
 		v.StorjKey,
+		v.ThumbnailStorjKey,
+		v.FileSize,
 		v.Status,
 		v.CurrentRevisionID,
 		v.Duration,
@@ -80,6 +85,7 @@ func (r *videoRepo) Create(ctx context.Context, v *model.Video) error {
 func (r *videoRepo) GetByID(ctx context.Context, id string) (*model.Video, error) {
 	query := `
 		SELECT id, brief_id, editor_id, title, description, storj_key,
+		       thumbnail_storj_key, file_size,
 		       status, current_revision_id, duration, resolution, thumbnail_url,
 		       submitted_at, created_at, updated_at
 		FROM video.videos
@@ -93,6 +99,8 @@ func (r *videoRepo) GetByID(ctx context.Context, id string) (*model.Video, error
 		&v.Title,
 		&v.Description,
 		&v.StorjKey,
+		&v.ThumbnailStorjKey,
+		&v.FileSize,
 		&v.Status,
 		&v.CurrentRevisionID,
 		&v.Duration,
@@ -120,13 +128,15 @@ func (r *videoRepo) Update(ctx context.Context, v *model.Video) error {
 			title = $4,
 			description = $5,
 			storj_key = $6,
-			status = $7,
-			current_revision_id = $8,
-			duration = $9,
-			resolution = $10,
-			thumbnail_url = $11,
-			submitted_at = $12,
-			updated_at = $13
+			thumbnail_storj_key = $7,
+			file_size = $8,
+			status = $9,
+			current_revision_id = $10,
+			duration = $11,
+			resolution = $12,
+			thumbnail_url = $13,
+			submitted_at = $14,
+			updated_at = $15
 		WHERE id = $1`
 
 	_, err := r.db.Exec(ctx, query,
@@ -136,6 +146,8 @@ func (r *videoRepo) Update(ctx context.Context, v *model.Video) error {
 		v.Title,
 		v.Description,
 		v.StorjKey,
+		v.ThumbnailStorjKey,
+		v.FileSize,
 		v.Status,
 		v.CurrentRevisionID,
 		v.Duration,
@@ -209,6 +221,7 @@ func (r *videoRepo) List(ctx context.Context, briefID, editorID, status string, 
 	// Main query
 	mainQuery := fmt.Sprintf(`
 		SELECT id, brief_id, editor_id, title, description, storj_key,
+		       thumbnail_storj_key, file_size,
 		       status, current_revision_id, duration, resolution, thumbnail_url,
 		       submitted_at, created_at, updated_at
 		FROM video.videos
@@ -235,6 +248,8 @@ func (r *videoRepo) List(ctx context.Context, briefID, editorID, status string, 
 			&v.Title,
 			&v.Description,
 			&v.StorjKey,
+			&v.ThumbnailStorjKey,
+			&v.FileSize,
 			&v.Status,
 			&v.CurrentRevisionID,
 			&v.Duration,
