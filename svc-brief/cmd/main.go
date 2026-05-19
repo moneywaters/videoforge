@@ -12,6 +12,7 @@ import (
 
 	"github.com/videoforge/backend/pkg/config"
 	"github.com/videoforge/backend/pkg/logger"
+	pkgmiddleware "github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/handler"
 	"github.com/videoforge/backend/svc-brief/internal/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/repository"
@@ -67,12 +68,12 @@ func main() {
 	mux.HandleFunc("GET /api/v1/briefs/$/raw-footage/download-url", wrapAuth(authMiddleware, briefHandler.HandleGetRawFootageDownloadURL))
 
 	// Add middleware chain
-	chain := middleware.Chain(
+	chain := pkgmiddleware.Chain(
 		mux,
-		middleware.RequestID,
-		middleware.Recover,
-		middleware.Logger,
-		middleware.CORS("*"),
+		pkgmiddleware.RequestID,
+		pkgmiddleware.Recover,
+		pkgmiddleware.Logger,
+		pkgmiddleware.CORS("*"),
 	)
 
 	// Create server
