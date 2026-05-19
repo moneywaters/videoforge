@@ -41,11 +41,7 @@ func main() {
 	repo := repository.NewBriefRepo(cfg.Database.Pool)
 
 	// Initialize service
-	var storageClient interface{} = cfg.Storage.Client
-	if !cfg.Storage.Enabled {
-		storageClient = nil
-	}
-	svc := service.NewBriefService(repo, storageClient)
+	svc := service.NewBriefService(repo, cfg.Storage.Client)
 
 	// Initialize handler
 	briefHandler := handler.NewBriefHandler(svc)
