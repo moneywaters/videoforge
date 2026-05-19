@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"log/slog"
 	"net/http"
+	"net/http/httputil"
+	"net/url"
 	"os"
 	"os/signal"
 	"syscall"
@@ -16,33 +18,46 @@ import (
 )
 
 func main() {
-	// Load configuration
 	cfg, err := config.Load("SERVER")
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
 
-	// Initialize logger
 	log := logger.Default(cfg.Environment)
-	_ = log
-
 	log.Info("Starting Gateway service",
 		slog.String("environment", cfg.Environment),
 		slog.String("port", cfg.Port),
 	)
 
-	// Set up HTTP router
-	mux := http.NewServeMux()
+	userTarget, _ := url.Parse("http://videoforge-user.flycast:8080")
+	briefTarget, _ := url.Parse("http://videoforge-brief.flycast:8080")
 
-	// Health check
+	userProxy := httputil.NewSingleHostReverseProxy(userTarget)
+	briefProxy := httputil.NewSingleHostReverseProxy(briefTarget)
+
+	mux := http.NewServeMux()
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"healthy"}`))
 	})
 
-	// Add middleware chain
+	// Proxy routes
+	mux.Handle("/api/v1/auth/", userProxy)
+	mux.Handle("/api/v1/users/", userProxy)
+	mux.Handle("/api/v1/briefs/", briefProxy)
+	mux.Handle("/api/v1/projects/", briefProxy)
+	mux.Handle("/api/v1/proposals/", briefProxy)
+	mux.Handle("/api/v1/milestones/", briefProxy)
+	mux.Handle("/api/v1/submissions/", briefProxy)
+	mux.Handle("/api/v1/payments/", briefProxy)
+	mux.Handle("/api/v1/disputes/", briefProxy)
+	mux.Handle("/api/v1/reviews/", briefProxy)
+	mux.Handle("/api/v1/notifications/", briefProxy)
+	mux.Handle("/api/v1/analytics/", briefProxy)
+	mux.Handle("/api/v1/assets/", briefProxy)
+
 	chain := middleware.Chain(
 		mux,
 		middleware.RequestID,
@@ -51,13 +66,11 @@ func main() {
 		middleware.CORS("*"),
 	)
 
-	// Create server
 	server := &http.Server{
 		Addr:    cfg.GetAddress(),
 		Handler: chain,
 	}
 
-	// Start server with graceful shutdown
 	errCh := make(chan error, 1)
 	go func() {
 		log.Info("Server starting", slog.String("address", server.Addr))
@@ -66,7 +79,6 @@ func main() {
 		}
 	}()
 
-	// Wait for shutdown signal
 	sigCh := make(chan os.Signal, 1)
 	signal.Notify(sigCh, os.Interrupt, syscall.SIGTERM)
 
@@ -78,7 +90,6 @@ func main() {
 		log.Info("Shutting down server...")
 	}
 
-	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 

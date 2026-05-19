@@ -10,44 +10,49 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/videoforge/backend/pkg/config"
 	"github.com/videoforge/backend/pkg/logger"
 	pkgmiddleware "github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/handler"
-	"github.com/videoforge/backend/svc-brief/internal/middleware"
+	briefmiddleware "github.com/videoforge/backend/svc-brief/internal/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/repository"
 	"github.com/videoforge/backend/svc-brief/internal/service"
+
+	briefconfig "github.com/videoforge/backend/svc-brief/internal/config"
 )
 
 func main() {
 	// Load configuration
-	cfg, err := config.Load("SERVER")
+	cfg, err := briefconfig.Load()
 	if err != nil {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
+	defer cfg.Close()
 
 	// Initialize logger
-	log := logger.Default(cfg.Environment)
-	_ = log
+	log := logger.Default(cfg.Server.Environment)
 
 	log.Info("Starting Brief service",
-		slog.String("environment", cfg.Environment),
-		slog.String("port", cfg.Port),
+		slog.String("environment", cfg.Server.Environment),
+		slog.String("port", cfg.Server.Port),
 	)
 
-	// Initialize repository (nil pool for now - requires DATABASE_URL)
-	repo := repository.NewBriefRepo(nil)
+	// Initialize repository
+	repo := repository.NewBriefRepo(cfg.Database.Pool)
 
-	// Initialize service (no storage for now)
-	svc := service.NewBriefService(repo, nil)
+	// Initialize service
+	var storageClient interface{} = cfg.Storage.Client
+	if !cfg.Storage.Enabled {
+		storageClient = nil
+	}
+	svc := service.NewBriefService(repo, storageClient)
 
 	// Initialize handler
 	briefHandler := handler.NewBriefHandler(svc)
 
 	// Load auth configuration
-	authConfig, _ := middleware.LoadAuthConfig()
-	authMiddleware := middleware.NewAuthMiddleware(authConfig)
+	authConfig, _ := briefmiddleware.LoadAuthConfig()
+	authMiddleware := briefmiddleware.NewAuthMiddleware(authConfig)
 
 	// Set up HTTP router
 	mux := http.NewServeMux()
@@ -78,7 +83,7 @@ func main() {
 
 	// Create server
 	server := &http.Server{
-		Addr:    cfg.GetAddress(),
+		Addr:    fmt.Sprintf(":%s", cfg.Server.Port),
 		Handler: chain,
 	}
 
@@ -122,7 +127,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 // wrapAuth wraps a handler with auth middleware
-func wrapAuth(auth *middleware.AuthMiddleware, handler http.HandlerFunc) http.HandlerFunc {
+func wrapAuth(auth *briefmiddleware.AuthMiddleware, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		handler(w, r)
 	}
