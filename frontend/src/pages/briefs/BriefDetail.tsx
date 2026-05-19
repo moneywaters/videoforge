@@ -112,7 +112,7 @@ export function BriefDetail() {
       queryClient.invalidateQueries({ queryKey: ['videos', 'brief', id] });
       alert('Upload successful!');
     },
-    onError: (error: any) => {
+    onError: (error: Error) => {
       alert(`Upload failed: ${error.message}`);
     }
   });
@@ -130,8 +130,8 @@ export function BriefDetail() {
     try {
       const { url } = await api.getDownloadUrl(id!);
       window.open(url, '_blank', 'noopener,noreferrer');
-    } catch (error: any) {
-      alert(`Download failed: ${error.message}`);
+    } catch (error: unknown) {
+      alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }
   };
 
