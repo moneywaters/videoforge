@@ -29,6 +29,35 @@ const uuid = () => 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (c) =
 // Mock data storage
 let currentUser: User | null = null;
 
+const BASE_URL = 'https://videoforge-gateway.fly.dev/api/v1';
+
+async function fetchWithAuth(url: string, options: RequestInit = {}) {
+  const token = localStorage.getItem('token');
+  const headers = new Headers(options.headers);
+  if (token) {
+    headers.set('Authorization', `Bearer ${token}`);
+  }
+  if (!headers.has('Content-Type')) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  const response = await fetch(`${BASE_URL}${url}`, {
+    ...options,
+    headers,
+  });
+
+  if (!response.ok) {
+    const errorData = await response.json().catch(() => ({}));
+    throw new Error(errorData.message || `HTTP error ${response.status}`);
+  }
+  
+  if (response.status === 204) {
+    return;
+  }
+
+  return response.json();
+}
+
 const mockUsers: User[] = [
   {
     id: 'usr-client-001',
@@ -568,34 +597,33 @@ const mockOnboardingSteps: OnboardingStep[] = [
 // API functions
 export const api = {
   // Auth
-  login: async (email: string, _password: string): Promise<User> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const user = mockUsers.find(u => u.email === email);
-    if (!user) {
-      throw new Error('Invalid credentials');
-    }
-    currentUser = user;
-    return user;
+  login: async (email: string, password: string): Promise<User> => {
+    const data = await fetchWithAuth('/auth/login', {
+      method: 'POST',
+      body: JSON.stringify({ email, password }),
+    });
+    currentUser = data.user;
+    localStorage.setItem('token', data.token);
+    return data.user;
   },
 
   register: async (email: string, name: string, role: User['role']): Promise<User> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const newUser: User = {
-      id: `usr-${uuid()}`,
-      email,
-      name,
-      role,
-      createdAt: new Date().toISOString(),
-      onboardingComplete: false,
-    };
-    mockUsers.push(newUser);
-    currentUser = newUser;
-    return newUser;
+    const data = await fetchWithAuth('/auth/register', {
+      method: 'POST',
+      body: JSON.stringify({ email, name, role }),
+    });
+    currentUser = data.user;
+    localStorage.setItem('token', data.token);
+    return data.user;
   },
 
   logout: async (): Promise<void> => {
-    await new Promise(resolve => setTimeout(resolve, 200));
-    currentUser = null;
+    try {
+      await fetchWithAuth('/auth/logout', { method: 'POST' }).catch(() => {});
+    } finally {
+      localStorage.removeItem('token');
+      currentUser = null;
+    }
   },
 
   loginWithGoogle: async (): Promise<User> => {
@@ -629,6 +657,27 @@ export const api = {
     mockUsers.push(googleUser);
     currentUser = googleUser;
     return googleUser;
+  },
+
+  // Storj File Upload / Download endpoints
+  getUploadUrl: async (briefId: string, filename: string, contentType: string): Promise<{ url: string; uploadId: string }> => {
+    return fetchWithAuth(`/briefs/${briefId}/raw-footage/upload-url`, {
+      method: 'POST',
+      body: JSON.stringify({ filename, contentType }),
+    });
+  },
+
+  confirmUpload: async (briefId: string, uploadId: string): Promise<void> => {
+    return fetchWithAuth(`/briefs/${briefId}/raw-footage/confirm`, {
+      method: 'POST',
+      body: JSON.stringify({ uploadId }),
+    });
+  },
+
+  getDownloadUrl: async (briefId: string): Promise<{ url: string }> => {
+    return fetchWithAuth(`/briefs/${briefId}/raw-footage/download-url`, {
+      method: 'GET',
+    });
   },
 
   getCurrentUser: async (): Promise<User | null> => {

@@ -1,5 +1,6 @@
+import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
@@ -51,6 +52,10 @@ function SubmissionItem({ video }: { video: Video }) {
 export function BriefDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
+  const queryClient = useQueryClient();
+
+  const [uploading, setUploading] = useState(false);
+  const [uploadProgress, setUploadProgress] = useState(0);
 
   const { data: brief, isLoading: briefLoading } = useQuery({
     queryKey: ['brief', id],
@@ -63,6 +68,72 @@ export function BriefDetail() {
     queryFn: () => api.getVideos(),
     enabled: !!id,
   });
+
+  const uploadMutation = useMutation({
+    mutationFn: async (file: File) => {
+      setUploading(true);
+      setUploadProgress(0);
+      try {
+        // 1. Get presigned URL
+        const { url, uploadId } = await api.getUploadUrl(id!, file.name, file.type);
+        
+        // 2. Upload directly to Storj via presigned URL with progress
+        await new Promise<void>((resolve, reject) => {
+          const xhr = new XMLHttpRequest();
+          xhr.open('PUT', url);
+          xhr.setRequestHeader('Content-Type', file.type);
+          
+          xhr.upload.onprogress = (e) => {
+            if (e.lengthComputable) {
+              setUploadProgress(Math.round((e.loaded / e.total) * 100));
+            }
+          };
+          
+          xhr.onload = () => {
+            if (xhr.status >= 200 && xhr.status < 300) {
+              resolve();
+            } else {
+              reject(new Error(`Upload failed with status ${xhr.status}`));
+            }
+          };
+          
+          xhr.onerror = () => reject(new Error('Upload failed'));
+          xhr.send(file);
+        });
+
+        // 3. Confirm upload
+        await api.confirmUpload(id!, uploadId);
+      } finally {
+        setUploading(false);
+        setUploadProgress(0);
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['videos', 'brief', id] });
+      alert('Upload successful!');
+    },
+    onError: (error: any) => {
+      alert(`Upload failed: ${error.message}`);
+    }
+  });
+
+  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      uploadMutation.mutate(file);
+    }
+    // reset input
+    e.target.value = '';
+  };
+
+  const handleDownload = async () => {
+    try {
+      const { url } = await api.getDownloadUrl(id!);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    } catch (error: any) {
+      alert(`Download failed: ${error.message}`);
+    }
+  };
 
   const briefVideos = videos?.filter((v) => v.briefId === id) ?? [];
 
@@ -126,6 +197,26 @@ export function BriefDetail() {
           {brief.tags.map((tag) => (
             <Badge key={tag} variant="info">{tag}</Badge>
           ))}
+        </div>
+        
+        <div className="flex gap-4 pt-4 border-t border-gray-100">
+           <div>
+             <input
+               type="file"
+               id="upload-footage"
+               className="hidden"
+               onChange={handleFileChange}
+               disabled={uploading}
+             />
+             <label htmlFor="upload-footage" className="cursor-pointer inline-block">
+               <div className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${uploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}>
+                 {uploading ? `Uploading... ${uploadProgress}%` : 'Upload Raw Footage'}
+               </div>
+             </label>
+           </div>
+           <Button variant="secondary" onClick={handleDownload}>
+             Download Raw Footage
+           </Button>
         </div>
       </div>
 
