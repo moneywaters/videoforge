@@ -30,8 +30,8 @@ func main() {
 		slog.String("port", cfg.Port),
 	)
 
-	userTarget, _ := url.Parse("https://videoforge-user.fly.dev")
-	briefTarget, _ := url.Parse("https://videoforge-brief.fly.dev")
+	userTarget, _ := url.Parse("http://videoforge-user.flycast:8080")
+	briefTarget, _ := url.Parse("http://videoforge-brief.flycast:8080")
 
 	userProxy := httputil.NewSingleHostReverseProxy(userTarget)
 	briefProxy := httputil.NewSingleHostReverseProxy(briefTarget)
