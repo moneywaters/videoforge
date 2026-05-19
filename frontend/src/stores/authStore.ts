@@ -7,6 +7,8 @@ interface AuthState {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
+  registerWithGoogle: () => Promise<void>;
   logout: () => void;
   setUser: (user: User | null) => void;
 }
@@ -20,6 +22,26 @@ export const useAuthStore = create<AuthState>()(
         set({ isLoading: true });
         try {
           const user = await api.login(email, password);
+          set({ user, isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+      loginWithGoogle: async () => {
+        set({ isLoading: true });
+        try {
+          const user = await api.loginWithGoogle();
+          set({ user, isLoading: false });
+        } catch (error) {
+          set({ isLoading: false });
+          throw error;
+        }
+      },
+      registerWithGoogle: async () => {
+        set({ isLoading: true });
+        try {
+          const user = await api.registerWithGoogle();
           set({ user, isLoading: false });
         } catch (error) {
           set({ isLoading: false });

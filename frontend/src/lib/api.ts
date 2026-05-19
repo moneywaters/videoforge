@@ -598,6 +598,39 @@ export const api = {
     currentUser = null;
   },
 
+  loginWithGoogle: async (): Promise<User> => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Google OAuth: Simulating Google login popup...');
+    const googleUser: User = {
+      id: 'usr-google-001',
+      email: 'google.user@gmail.com',
+      name: 'Alex Google',
+      role: 'client',
+      avatar: 'https://ui-avatars.com/api/?name=Alex+Google&background=0D8ABC&color=fff',
+      createdAt: new Date().toISOString(),
+      onboardingComplete: false,
+    };
+    currentUser = googleUser;
+    return googleUser;
+  },
+
+  registerWithGoogle: async (): Promise<User> => {
+    await new Promise(resolve => setTimeout(resolve, 1000));
+    console.log('Google OAuth: Simulating Google register popup...');
+    const googleUser: User = {
+      id: 'usr-google-001',
+      email: 'google.user@gmail.com',
+      name: 'Alex Google',
+      role: 'client',
+      avatar: 'https://ui-avatars.com/api/?name=Alex+Google&background=0D8ABC&color=fff',
+      createdAt: new Date().toISOString(),
+      onboardingComplete: false,
+    };
+    mockUsers.push(googleUser);
+    currentUser = googleUser;
+    return googleUser;
+  },
+
   getCurrentUser: async (): Promise<User | null> => {
     await new Promise(resolve => setTimeout(resolve, 300));
     return currentUser;

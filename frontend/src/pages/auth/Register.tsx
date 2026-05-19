@@ -1,9 +1,11 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
+import { Chrome } from 'lucide-react';
 import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Card, CardBody, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
+import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import type { UserRole } from '@/types/index';
@@ -16,6 +18,7 @@ const ROLE_OPTIONS = [
 
 export default function Register() {
   const navigate = useNavigate();
+  const { registerWithGoogle } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -24,6 +27,19 @@ export default function Register() {
   const [role, setRole] = useState<UserRole>('client');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const handleGoogleSignup = async () => {
+    setError('');
+    setIsLoading(true);
+    try {
+      await registerWithGoogle();
+      navigate('/onboarding');
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Google signup failed');
+    } finally {
+      setIsLoading(false);
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -60,6 +76,23 @@ export default function Register() {
           <CardDescription>Join VideoForge and start creating</CardDescription>
         </CardHeader>
         <CardBody>
+          <button
+            type="button"
+            onClick={handleGoogleSignup}
+            disabled={isLoading}
+            className="w-full flex items-center justify-center gap-2 bg-white border border-gray-300 text-gray-700 hover:bg-gray-50 py-2 px-4 rounded-md font-medium transition-colors disabled:pointer-events-none disabled:opacity-50"
+          >
+            <Chrome className="w-5 h-5" />
+            <span>Sign up with Google</span>
+          </button>
+          <div className="relative py-2">
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t border-gray-300" />
+            </div>
+            <div className="relative flex justify-center text-sm">
+              <span className="px-2 bg-white text-gray-500">or sign up with email</span>
+            </div>
+          </div>
           <form onSubmit={handleSubmit} className="space-y-4">
             {error && (
               <div className="p-3 text-sm text-rose-600 bg-rose-50 rounded-md">
