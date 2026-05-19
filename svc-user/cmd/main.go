@@ -93,18 +93,20 @@ func main() {
 	}
 	defer pool.Close()
 
-	// Ensure users table exists
+	// Ensure users table exists (matches migration schema)
 	ctx := context.Background()
 	_, err = pool.Exec(ctx, `
 		CREATE TABLE IF NOT EXISTS users (
 			id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-			email TEXT UNIQUE NOT NULL,
-			password_hash TEXT NOT NULL,
-			name TEXT,
-			role TEXT DEFAULT 'client',
-			status TEXT DEFAULT 'active',
-			created_at TIMESTAMPTZ DEFAULT NOW(),
-			updated_at TIMESTAMPTZ DEFAULT NOW()
+			email VARCHAR(255) NOT NULL UNIQUE,
+			password_hash VARCHAR(255) NOT NULL,
+			first_name VARCHAR(255) NOT NULL DEFAULT '',
+			last_name VARCHAR(255) NOT NULL DEFAULT '',
+			role VARCHAR(50) NOT NULL DEFAULT 'client',
+			status VARCHAR(50) NOT NULL DEFAULT 'active',
+			created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+			updated_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT NOW(),
+			last_login_at TIMESTAMP WITH TIME ZONE
 		)
 	`)
 	if err != nil {
@@ -121,17 +123,14 @@ func main() {
 	}
 
 	// Setup router
-	mux := http.NewServeMux()
+	api := http.NewServeMux()
 
 	// Health check
-	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
+	api.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
 	})
-
-	// API routes
-	api := http.NewServeMux()
 
 	// Register handler
 	api.HandleFunc("POST /api/v1/auth/register", handleRegister(pool, jwtSecret, log))
@@ -243,11 +242,11 @@ func handleRegister(pool *pgxpool.Pool, jwtSecret string, log *logger.Logger) ht
 			return
 		}
 
-		// Insert user
+		// Insert user (map name -> first_name, blank last_name)
 		var userID, role, status string
 		err = pool.QueryRow(context.Background(),
-			`INSERT INTO users (email, password_hash, name, role, status) VALUES ($1, $2, $3, $4, $5) RETURNING id, role, status`,
-			req.Email, string(hashedPassword), req.Name, "client", "active",
+			`INSERT INTO users (email, password_hash, first_name, last_name, role, status) VALUES ($1, $2, $3, $4, $5, $6) RETURNING id, role, status`,
+			req.Email, string(hashedPassword), req.Name, "", "client", "active",
 		).Scan(&userID, &role, &status)
 		if err != nil {
 			http.Error(w, `{"error":"user already exists or invalid"}`, http.StatusConflict)
@@ -291,11 +290,15 @@ func handleLogin(pool *pgxpool.Pool, jwtSecret string, log *logger.Logger) http.
 		}
 
 		// Get user by email
-		var userID, passwordHash, name, role, status string
+		var userID, passwordHash, firstName, lastName, role, status string
 		err := pool.QueryRow(context.Background(),
-			`SELECT id, password_hash, COALESCE(name, ''), role, status FROM users WHERE email = $1`,
+			`SELECT id, password_hash, first_name, last_name, role, status FROM users WHERE email = $1`,
 			req.Email,
-		).Scan(&userID, &passwordHash, &name, &role, &status)
+		).Scan(&userID, &passwordHash, &firstName, &lastName, &role, &status)
+		name := firstName
+		if lastName != "" {
+			name = firstName + " " + lastName
+		}
 		if err != nil {
 			http.Error(w, `{"error":"invalid credentials"}`, http.StatusUnauthorized)
 			return
@@ -366,11 +369,15 @@ func handleGetMe(pool *pgxpool.Pool, jwtSecret string, log *logger.Logger) http.
 		}
 
 		// Get user from database
-		var email, name, role, status string
+		var email, firstName, lastName, role, status string
 		err = pool.QueryRow(context.Background(),
-			`SELECT email, COALESCE(name, ''), role, status FROM users WHERE id = $1`,
+			`SELECT email, first_name, last_name, role, status FROM users WHERE id = $1`,
 			sub,
-		).Scan(&email, &name, &role, &status)
+		).Scan(&email, &firstName, &lastName, &role, &status)
+		name := firstName
+		if lastName != "" {
+			name = firstName + " " + lastName
+		}
 		if err != nil {
 			http.Error(w, `{"error":"user not found"}`, http.StatusNotFound)
 			return
