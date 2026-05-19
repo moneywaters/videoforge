@@ -43,10 +43,14 @@ func main() {
 		w.Write([]byte(`{"status":"healthy"}`))
 	})
 
-	// Proxy routes
+	// Proxy routes (exact + prefix)
+	mux.Handle("/api/v1/auth", userProxy)
 	mux.Handle("/api/v1/auth/", userProxy)
+	mux.Handle("/api/v1/users", userProxy)
 	mux.Handle("/api/v1/users/", userProxy)
+	mux.Handle("/api/v1/briefs", briefProxy)
 	mux.Handle("/api/v1/briefs/", briefProxy)
+	mux.Handle("/api/v1/projects", briefProxy)
 	mux.Handle("/api/v1/projects/", briefProxy)
 	mux.Handle("/api/v1/proposals/", briefProxy)
 	mux.Handle("/api/v1/milestones/", briefProxy)
