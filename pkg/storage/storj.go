@@ -100,8 +100,15 @@ func (s *storjStorage) ObjectExists(ctx context.Context, key string) (bool, erro
 		return false, errors.Internal(fmt.Sprintf("failed to check object existence: %v", err))
 	}
 
-return true, nil
+	return true, nil
 }
+
+// GetObject retrieves an object from Storj storage.
+// Returns an io.ReadCloser that must be closed by the caller.
+func (s *storjStorage) GetObject(ctx context.Context, key string) (io.ReadCloser, error) {
+	if key == "" {
+		return nil, errors.BadRequest("key cannot be empty")
+	}
 
 	resp, err := s.client.GetObject(ctx, &s3.GetObjectInput{
 		Bucket: aws.String(s.config.Bucket),
@@ -129,13 +136,4 @@ func isNoSuchKeyError(err error, _ *types.NoSuchKey) bool {
 	return bytes.Contains([]byte(errStr), []byte("NoSuchKey")) ||
 		bytes.Contains([]byte(errStr), []byte("not found")) ||
 		bytes.Contains([]byte(errStr), []byte("404"))
-}
-
-// isAlreadyExistsError checks if the error is an AlreadyExistsError.
-func isAlreadyExistsError(err error, _ *types.AlreadyExistsError) bool {
-	if err == nil {
-		return false
-	}
-	errStr := err.Error()
-	return bytes.Contains([]byte(errStr), []byte("AlreadyExists"))
 }

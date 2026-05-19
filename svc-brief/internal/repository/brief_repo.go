@@ -218,7 +218,7 @@ func (r *BriefRepo) DeleteBrief(ctx context.Context, id uuid.UUID) error {
 }
 
 // buildListBriefsQuery builds the query and args for listing briefs
-func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, tags []string, page, limit int) (string, []interface{}, int) {
+func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, tags []string, page, limit int) (string, string, []interface{}, []interface{}) {
 	baseQuery := `
 		SELECT b.id, b.client_id, b.title, b.description, b.goals, b.target_audience,
 			b.tone, b.style_preferences, b.cta, b.status, b.bounty_budget, b.bounty_deposited,
@@ -228,18 +228,21 @@ func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, ta
 	countQuery := `SELECT COUNT(DISTINCT b.id) FROM brief.briefs b`
 
 	var conditions []string
-	var args []interface{}
+	var listArgs []interface{}
+	var countArgs []interface{}
 	argNum := 1
 
 	if clientID != nil {
 		conditions = append(conditions, fmt.Sprintf("b.client_id = $%d", argNum))
-		args = append(args, *clientID)
+		listArgs = append(listArgs, *clientID)
+		countArgs = append(countArgs, *clientID)
 		argNum++
 	}
 
 	if status != nil {
 		conditions = append(conditions, fmt.Sprintf("b.status = $%d", argNum))
-		args = append(args, *status)
+		listArgs = append(listArgs, *status)
+		countArgs = append(countArgs, *status)
 		argNum++
 	}
 
@@ -253,7 +256,8 @@ func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, ta
 			placeholders[i] = fmt.Sprintf("$%d", argNum)
 			argNum++
 		}
-		args = append(args, tagArgs...)
+		listArgs = append(listArgs, tagArgs...)
+		countArgs = append(countArgs, tagArgs...)
 		conditions = append(conditions, fmt.Sprintf("bt.tag IN ("+joinStrings(placeholders)+")"))
 	}
 
@@ -263,11 +267,12 @@ func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, ta
 	}
 
 	offset := (page - 1) * limit
-	query := baseQuery + whereClause + fmt.Sprintf(" ORDER BY b.created_at DESC LIMIT $%d OFFSET $%d", argNum, argNum+1)
-	args = append(args, limit, offset)
-	countQuery += whereClause
+	listArgs = append(listArgs, limit, offset)
 
-	return countQuery, query, 0
+	fullListQuery := baseQuery + whereClause + fmt.Sprintf(" ORDER BY b.created_at DESC LIMIT $%d OFFSET $%d", argNum, argNum+1)
+	fullCountQuery := countQuery + whereClause
+
+	return fullCountQuery, fullListQuery, countArgs, listArgs
 }
 
 // joinStrings joins strings with commas
@@ -295,10 +300,10 @@ func (r *BriefRepo) ListBriefs(ctx context.Context, clientID *uuid.UUID, status 
 	}
 
 	// Build the main query
-	countQuery, query, _ := r.buildListBriefsQuery(clientID, status, tags, page, limit)
+	countQuery, listQuery, countArgs, listArgs := r.buildListBriefsQuery(clientID, status, tags, page, limit)
 
-	// Execute main query - last 2 args are limit and offset
-	rows, err := r.db.Query(ctx, query)
+	// Execute main query
+	rows, err := r.db.Query(ctx, listQuery, listArgs...)
 	if err != nil {
 		return nil, fmt.Errorf("failed to list briefs: %w", err)
 	}
@@ -342,7 +347,7 @@ func (r *BriefRepo) ListBriefs(ctx context.Context, clientID *uuid.UUID, status 
 
 	// Get total count
 	var total int
-	if err := r.db.QueryRow(ctx, countQuery).Scan(&total); err != nil {
+	if err := r.db.QueryRow(ctx, countQuery, countArgs...).Scan(&total); err != nil {
 		return nil, fmt.Errorf("failed to get count: %w", err)
 	}
 
@@ -453,11 +458,11 @@ func (r *BriefRepo) CreateBriefQuestion(ctx context.Context, q *model.BriefQuest
 	}
 
 	query := `
-		INSERT INTO brief.brief_questions (id, brief_id, question, answer, created_at)
-		VALUES ($1, $2, $3, $4, $5)
+		INSERT INTO brief.brief_questions (id, brief_id, question, answer)
+		VALUES ($1, $2, $3, $4)
 	`
 
-	_, err := r.db.Exec(ctx, query, q.ID, q.BriefID, q.Question, q.Answer, q.CreatedAt)
+	_, err := r.db.Exec(ctx, query, q.ID, q.BriefID, q.Question, q.Answer)
 	if err != nil {
 		return fmt.Errorf("failed to create brief question: %w", err)
 	}
@@ -467,7 +472,7 @@ func (r *BriefRepo) CreateBriefQuestion(ctx context.Context, q *model.BriefQuest
 
 // GetBriefQuestions gets questions for a brief
 func (r *BriefRepo) GetBriefQuestions(ctx context.Context, briefID uuid.UUID) ([]model.BriefQuestion, error) {
-	query := `SELECT id, brief_id, question, answer, created_at FROM brief.brief_questions WHERE brief_id = $1`
+	query := `SELECT id, brief_id, question, answer FROM brief.brief_questions WHERE brief_id = $1`
 
 	rows, err := r.db.Query(ctx, query, briefID)
 	if err != nil {
@@ -478,7 +483,7 @@ func (r *BriefRepo) GetBriefQuestions(ctx context.Context, briefID uuid.UUID) ([
 	var questions []model.BriefQuestion
 	for rows.Next() {
 		var q model.BriefQuestion
-		if err := rows.Scan(&q.ID, &q.BriefID, &q.Question, &q.Answer, &q.CreatedAt); err != nil {
+		if err := rows.Scan(&q.ID, &q.BriefID, &q.Question, &q.Answer); err != nil {
 			return nil, fmt.Errorf("failed to scan question: %w", err)
 		}
 		questions = append(questions, q)
