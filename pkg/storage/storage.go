@@ -11,7 +11,6 @@ import (
 	"net/http"
 	"time"
 
-	"github.com/aws/aws-sdk-go-v2/aws"
 	"github.com/aws/aws-sdk-go-v2/config"
 	"github.com/aws/aws-sdk-go-v2/credentials"
 	"github.com/aws/aws-sdk-go-v2/service/s3"
@@ -87,10 +86,9 @@ func NewStorage(cfg StorjConfig) (Storage, error) {
 		return nil, errors.Internal(fmt.Sprintf("failed to load AWS config: %v", err))
 	}
 
-	// Create S3 client with custom endpoint
+	// Create S3 client
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
-		o.BaseURL = cfg.Endpoint
-		o.UsePathStyle = true // Required for Storj gateway
+		o.UsePathStyle = true
 	})
 
 	return &storjStorage{
