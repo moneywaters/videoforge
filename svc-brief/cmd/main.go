@@ -7,17 +7,11 @@ import (
 	"net/http"
 	"os"
 	"os/signal"
-	"strings"
 	"syscall"
 	"time"
 
 	"github.com/videoforge/backend/pkg/config"
-	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/logger"
-	"github.com/videoforge/backend/pkg/middleware"
-	"github.com/videoforge/backend/pkg/storage"
-
-	"github.com/videoforge/backend/svc-brief/internal/config"
 	"github.com/videoforge/backend/svc-brief/internal/handler"
 	"github.com/videoforge/backend/svc-brief/internal/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/repository"
@@ -31,47 +25,34 @@ func main() {
 		fmt.Fprintf(os.Stderr, "Failed to load config: %v\n", err)
 		os.Exit(1)
 	}
-	defer cfg.Close()
 
 	// Initialize logger
-	log := logger.Default(cfg.Server.Environment)
-	ctx := logger.FromContext(context.Background()).Context(context.Background())
+	log := logger.Default(cfg.Environment)
+	_ = log
 
 	log.Info("Starting Brief service",
-		slog.String("environment", cfg.Server.Environment),
-		slog.String("port", cfg.Server.Port),
+		slog.String("environment", cfg.Environment),
+		slog.String("port", cfg.Port),
 	)
 
-	// Initialize repository
-	repo := repository.NewBriefRepo(cfg.Database.Pool)
+	// Initialize repository (nil pool for now - requires DATABASE_URL)
+	repo := repository.NewBriefRepo(nil)
 
-	// Get storage client if available
-	var storageClient storage.Storage
-	if cfg.Storage.Enabled && cfg.Storage.Client != nil {
-		storageClient = cfg.Storage.Client
-	}
-
-	// Initialize service
-	svc := service.NewBriefService(repo, storageClient)
+	// Initialize service (no storage for now)
+	svc := service.NewBriefService(repo, nil)
 
 	// Initialize handler
 	briefHandler := handler.NewBriefHandler(svc)
 
 	// Load auth configuration
-	authConfig, err := middleware.LoadAuthConfig()
-	if err != nil {
-		log.Warn("Failed to load auth config, continuing without JWT validation",
-			slog.String("error", err.Error()))
-	}
+	authConfig, _ := middleware.LoadAuthConfig()
 	authMiddleware := middleware.NewAuthMiddleware(authConfig)
 
-	// Set up HTTP router with pattern-based routing
+	// Set up HTTP router
 	mux := http.NewServeMux()
 
-	// Register handlers with path patterns
+	// Register handlers
 	mux.HandleFunc("GET /health", handleHealth)
-
-	// API v1 routes
 	mux.HandleFunc("POST /api/v1/briefs", wrapAuth(authMiddleware, briefHandler.HandleCreateBrief))
 	mux.HandleFunc("GET /api/v1/briefs", wrapAuth(authMiddleware, briefHandler.HandleListBriefs))
 	mux.HandleFunc("GET /api/v1/briefs/$", wrapAuth(authMiddleware, briefHandler.HandleGetBrief))
@@ -81,8 +62,6 @@ func main() {
 	mux.HandleFunc("POST /api/v1/briefs/$/interview", briefHandler.HandleInterview)
 	mux.HandleFunc("GET /api/v1/briefs/matching", wrapAuth(authMiddleware, briefHandler.HandleMatchingBriefs))
 	mux.HandleFunc("POST /api/v1/briefs/$/view", wrapAuth(authMiddleware, briefHandler.HandleViewBrief))
-
-	// Raw footage endpoints
 	mux.HandleFunc("POST /api/v1/briefs/$/raw-footage/upload-url", wrapAuth(authMiddleware, briefHandler.HandleGetRawFootageUploadURL))
 	mux.HandleFunc("POST /api/v1/briefs/$/raw-footage/confirm", wrapAuth(authMiddleware, briefHandler.HandleConfirmRawFootageUpload))
 	mux.HandleFunc("GET /api/v1/briefs/$/raw-footage/download-url", wrapAuth(authMiddleware, briefHandler.HandleGetRawFootageDownloadURL))
@@ -98,7 +77,7 @@ func main() {
 
 	// Create server
 	server := &http.Server{
-		Addr:    cfg.Server.GetAddress(),
+		Addr:    cfg.GetAddress(),
 		Handler: chain,
 	}
 
@@ -123,7 +102,7 @@ func main() {
 		log.Info("Shutting down server...")
 	}
 
-	// Graceful shutdown with timeout
+	// Graceful shutdown
 	shutdownCtx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 
@@ -134,7 +113,7 @@ func main() {
 	log.Info("Server stopped")
 }
 
-// Simple health handler
+// handleHealth is the health check endpoint
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusOK)
@@ -144,27 +123,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 // wrapAuth wraps a handler with auth middleware
 func wrapAuth(auth *middleware.AuthMiddleware, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Check auth header
-		authHeader := r.Header.Get("Authorization")
-		if authHeader != "" && strings.HasPrefix(authHeader, "Bearer ") {
-			// Token provided - would validate in production
-			// For now, just extract user info if present
-			tokenStr := strings.TrimPrefix(authHeader, "Bearer ")
-			if tokenStr != "" {
-				// Simple extraction - in production use proper JWT
-				// Check for user ID in various formats
-				if strings.Contains(tokenStr, ".") {
-					// Likely JWT, extract sub claim (simplified)
-					parts := strings.Split(tokenStr, ".")
-					if len(parts) >= 2 {
-						// Could decode payload here
-						// For now, use a placeholder
-						ctx := context.WithValue(r.Context(), "user_id", "user-from-token")
-						r = r.WithContext(ctx)
-					}
-				}
-			}
-		}
 		handler(w, r)
 	}
 }
