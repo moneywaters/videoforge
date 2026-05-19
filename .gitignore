@@ -50,4 +50,6 @@ coverage.out
 
 # Temporary files
 tmp/
-temp/
+temp/node_modules/
+dist/
+.env
