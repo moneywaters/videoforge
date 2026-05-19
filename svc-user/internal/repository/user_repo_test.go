@@ -7,7 +7,7 @@ import (
 
 	"github.com/google/uuid"
 
-	"svc-user/internal/model"
+	"github.com/videoforge/backend/svc-user/internal/model"
 )
 
 // =============================================================================

@@ -5,8 +5,8 @@ import (
 	"net/http"
 
 	"github.com/videoforge/backend/pkg/auth"
-	"svc-user/internal/model"
-	"svc-user/internal/service"
+	"github.com/videoforge/backend/svc-user/internal/model"
+	"github.com/videoforge/backend/svc-user/internal/service"
 
 	"github.com/videoforge/backend/pkg/errors"
 )

@@ -9,10 +9,10 @@ import (
 	"syscall"
 	"time"
 
-	"svc-user/internal/config"
-	"svc-user/internal/handler"
-	"svc-user/internal/repository"
-	"svc-user/internal/service"
+	"github.com/videoforge/backend/svc-user/internal/config"
+	"github.com/videoforge/backend/svc-user/internal/handler"
+	"github.com/videoforge/backend/svc-user/internal/repository"
+	"github.com/videoforge/backend/svc-user/internal/service"
 
 	"github.com/videoforge/backend/pkg/logger"
 	backendmiddleware "github.com/videoforge/backend/pkg/middleware"

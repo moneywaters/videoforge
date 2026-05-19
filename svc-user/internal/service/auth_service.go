@@ -10,8 +10,8 @@ import (
 	"github.com/google/uuid"
 	"golang.org/x/crypto/bcrypt"
 
-	"svc-user/internal/model"
-	"svc-user/internal/repository"
+	"github.com/videoforge/backend/svc-user/internal/model"
+	"github.com/videoforge/backend/svc-user/internal/repository"
 
 	"github.com/videoforge/backend/pkg/errors"
 )
