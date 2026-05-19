@@ -78,28 +78,18 @@ func NewStorage(cfg StorjConfig) (Storage, error) {
 		cfg.Region = "us-east-1"
 	}
 
-	// Create AWS SDK v2 configuration with custom endpoint
+	// Create AWS SDK v2 configuration
 	awsCfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
 		config.WithRegion(cfg.Region),
-		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
-			func(service, region string, options interface{}, optFns ...interface{}) (aws.Endpoint, error) {
-				if service == "s3" {
-					return aws.Endpoint{
-						URL:               cfg.Endpoint,
-						HostnameImmutable: true,
-					}, nil
-				}
-				return aws.Endpoint{}, aws.EndpointNotFoundError{}
-			},
-		)),
 	)
 	if err != nil {
 		return nil, errors.Internal(fmt.Sprintf("failed to load AWS config: %v", err))
 	}
 
-	// Create S3 client
+	// Create S3 client with custom endpoint
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseURL = cfg.Endpoint
 		o.UsePathStyle = true // Required for Storj gateway
 	})
 
