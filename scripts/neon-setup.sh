@@ -182,7 +182,7 @@ create_project() {
     data=$(jq -n \
         --arg name "$project_name" \
         --arg region "$REGION" \
-        --arg pg_version "$DEFAULT_PG_VERSION" \
+        --argjson pg_version "$DEFAULT_PG_VERSION" \
         '{
             project: {
                 name: $name,
