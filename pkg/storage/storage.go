@@ -79,14 +79,14 @@ func NewStorage(cfg StorjConfig) (Storage, error) {
 	}
 
 	// Create custom endpoint resolver for Storj
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options interface{}, optFns ...interface{}) (aws.Endpoint, error) {
+	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options interface{}, optFns ...func(*aws.Options)) (aws.Endpoint, error) {
 		if service == "s3" || service == "S3" {
 			return aws.Endpoint{
-				URL:           cfg.Endpoint,
+				URL:               cfg.Endpoint,
 				HostnameImmutable: true,
 			}, nil
 		}
-		return aws.Endpoint{}, &aws.EndpointNotFoundError{}
+		return aws.Endpoint{}, fmt.Errorf("endpoint not found")
 	})
 
 	// Create AWS SDK v2 configuration

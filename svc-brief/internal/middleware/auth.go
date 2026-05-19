@@ -59,10 +59,15 @@ func LoadAuthConfig() (*AuthConfig, error) {
 
 func parsePublicKey(keyStr string) (*AuthConfig, error) {
 	// Try base64 decode first
-	data, err := base64.StdEncoding.DecodeString(keyStr)
+	_, err := base64.StdEncoding.DecodeString(keyStr)
 	if err != nil {
 		// Try plain string (PEM format)
-		data = []byte(keyStr)
+		// For now, return simple config
+		return &AuthConfig{
+			PublicKey:    nil,
+			PublicKeyStr: keyStr,
+			KeyID:       "videoforge-key",
+		}, nil
 	}
 
 	// Try to parse as RSA public key

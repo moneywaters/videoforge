@@ -270,36 +270,6 @@ func (r *BriefRepo) buildListBriefsQuery(clientID *uuid.UUID, status *string, ta
 	return countQuery, query, 0
 }
 
-	if status != nil {
-		conditions = append(conditions, fmt.Sprintf("b.status = $%d", argNum))
-		args = append(args, *status)
-		argNum++
-	}
-
-	if len(tags) > 0 {
-		baseQuery += ` JOIN brief.brief_tags bt ON b.id = bt.brief_id`
-		countQuery += ` JOIN brief.brief_tags bt ON b.id = bt.brief_id`
-		placeholders := make([]string, len(tags))
-		for i, tag := range tags {
-			placeholders[i] = fmt.Sprintf("$%d", argNum)
-			args = append(args, tag)
-			argNum++
-		}
-		conditions = append(conditions, fmt.Sprintf("bt.tag IN (%s)", joinStrings(placeholders)))
-	}
-
-	whereClause := ""
-	if len(conditions) > 0 {
-		whereClause = " WHERE " + joinStrings(conditions)
-	}
-
-	offset := (page - 1) * limit
-	query := baseQuery + whereClause + fmt.Sprintf(" ORDER BY b.created_at DESC LIMIT $%d OFFSET $%d", argNum, argNum+1)
-	countQuery += whereClause
-
-	return countQuery + "; " + query, args, offset
-}
-
 // joinStrings joins strings with commas
 func joinStrings(s []string) string {
 	result := ""

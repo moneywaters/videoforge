@@ -55,7 +55,7 @@ func Recover(next http.Handler) http.Handler {
 			if recovered := recover(); recovered != nil {
 				// Log the panic
 				requestID := GetRequestID(r.Context())
-				log.Printf("[PANIC] Request ID: %s, Error: %v", requestID, recovered)
+				slog.Error("panic recovered", slog.String("request_id", requestID), slog.Any("error", recovered))
 
 				// Write the 500 response
 				wrapper.WriteHeader(http.StatusInternalServerError)
