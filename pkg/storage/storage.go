@@ -78,22 +78,21 @@ func NewStorage(cfg StorjConfig) (Storage, error) {
 		cfg.Region = "us-east-1"
 	}
 
-	// Create custom endpoint resolver for Storj
-	customResolver := aws.EndpointResolverWithOptionsFunc(func(service, region string, options interface{}, optFns ...func(*aws.Options)) (aws.Endpoint, error) {
-		if service == "s3" || service == "S3" {
-			return aws.Endpoint{
-				URL:               cfg.Endpoint,
-				HostnameImmutable: true,
-			}, nil
-		}
-		return aws.Endpoint{}, fmt.Errorf("endpoint not found")
-	})
-
-	// Create AWS SDK v2 configuration
+	// Create AWS SDK v2 configuration with custom endpoint
 	awsCfg, err := config.LoadDefaultConfig(context.Background(),
 		config.WithCredentialsProvider(credentials.NewStaticCredentialsProvider(cfg.AccessKey, cfg.SecretKey, "")),
 		config.WithRegion(cfg.Region),
-		config.WithEndpointResolverWithOptions(customResolver),
+		config.WithEndpointResolverWithOptions(aws.EndpointResolverWithOptionsFunc(
+			func(service, region string, options interface{}, optFns ...interface{}) (aws.Endpoint, error) {
+				if service == "s3" {
+					return aws.Endpoint{
+						URL:               cfg.Endpoint,
+						HostnameImmutable: true,
+					}, nil
+				}
+				return aws.Endpoint{}, aws.EndpointNotFoundError{}
+			},
+		)),
 	)
 	if err != nil {
 		return nil, errors.Internal(fmt.Sprintf("failed to load AWS config: %v", err))
