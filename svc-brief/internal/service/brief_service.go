@@ -332,13 +332,11 @@ func (s *BriefService) Interview(ctx context.Context, briefID uuid.UUID, req mod
 		_ = s.repo.UpdateBrief(ctx, brief)
 
 		// Store Q&A
-		now := time.Now()
 		q := &model.BriefQuestion{
 			ID:        uuid.Must(uuid.NewV7()),
 			BriefID:   briefID,
-			Question:  "User message",
-			Answer:    message,
-			CreatedAt: now,
+			Question: "User message",
+			Answer:   message,
 		}
 		_ = s.repo.CreateBriefQuestion(ctx, q)
 	}
@@ -505,8 +503,8 @@ func (s *BriefService) GetRawFootageUploadURL(ctx context.Context, userID, brief
 	// Generate Storj key: briefs/{briefID}/raw_footage/{filename}
 	storjKey := fmt.Sprintf("briefs/%s/raw_footage/%s", briefID.String(), filename)
 
-	// Generate presigned upload URL
-	uploadURL, expiresIn, err := s.storage.GeneratePresignedUploadURL(ctx, storjKey)
+	// Generate presigned upload URL (default 1 hour expiration)
+	uploadURL, err := s.storage.GeneratePresignedUploadURL(ctx, storjKey, time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate upload URL: %w", err)
 	}
@@ -514,7 +512,7 @@ func (s *BriefService) GetRawFootageUploadURL(ctx context.Context, userID, brief
 	return &model.UploadRawFootageResponse{
 		UploadURL: uploadURL,
 		StorjKey:  storjKey,
-		ExpiresIn: expiresIn,
+		ExpiresIn: int(time.Hour.Seconds()),
 	}, nil
 }
 
@@ -603,14 +601,14 @@ func (s *BriefService) GetRawFootageDownloadURL(ctx context.Context, userID, bri
 		return nil, errors.Forbidden("not authorized to download raw footage for this brief")
 	}
 
-	// Generate presigned download URL
-	downloadURL, expiresIn, err := s.storage.GeneratePresignedDownloadURL(ctx, brief.RawFootageStorjKey)
+	// Generate presigned download URL (default 1 hour expiration)
+	downloadURL, err := s.storage.GeneratePresignedDownloadURL(ctx, brief.RawFootageStorjKey, time.Hour)
 	if err != nil {
 		return nil, fmt.Errorf("failed to generate download URL: %w", err)
 	}
 
 	return &model.RawFootageDownloadURLResponse{
 		DownloadURL: downloadURL,
-		ExpiresIn:   expiresIn,
+		ExpiresIn:   int(time.Hour.Seconds()),
 	}, nil
 }

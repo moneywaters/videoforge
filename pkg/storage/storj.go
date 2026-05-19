@@ -125,6 +125,11 @@ func (s *storjStorage) GetObject(ctx context.Context, key string) (io.ReadCloser
 	return resp.Body, nil
 }
 
+// FileExists is an alias for ObjectExists for compatibility.
+func (s *storjStorage) FileExists(ctx context.Context, key string) (bool, error) {
+	return s.ObjectExists(ctx, key)
+}
+
 // isNoSuchKeyError checks if the error is a NoSuchKey error.
 func isNoSuchKeyError(err error, _ *types.NoSuchKey) bool {
 	if err == nil {

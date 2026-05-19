@@ -37,6 +37,9 @@ type Storage interface {
 	// GetObject retrieves an object from storage.
 	// Returns an io.ReadCloser that must be closed by the caller.
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
+
+	// FileExists is an alias for ObjectExists for compatibility.
+	FileExists(ctx context.Context, key string) (bool, error)
 }
 
 // StorjConfig holds the configuration for connecting to Storj S3-compatible storage.
