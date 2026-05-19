@@ -7,8 +7,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"svc-brief/internal/model"
-	"svc-brief/internal/repository"
+	"github.com/videoforge/backend/svc-brief/internal/model"
+	"github.com/videoforge/backend/svc-brief/internal/repository"
 
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/storage"

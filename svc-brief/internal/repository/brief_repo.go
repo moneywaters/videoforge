@@ -8,7 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"svc-brief/internal/model"
+	"github.com/videoforge/backend/svc-brief/internal/model"
 
 	"github.com/videoforge/backend/pkg/errors"
 )

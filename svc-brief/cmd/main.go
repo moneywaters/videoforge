@@ -17,11 +17,11 @@ import (
 	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/storage"
 
-	"svc-brief/internal/config"
-	"svc-brief/internal/handler"
-	"svc-brief/internal/middleware"
-	"svc-brief/internal/repository"
-	"svc-brief/internal/service"
+	"github.com/videoforge/backend/svc-brief/internal/config"
+	"github.com/videoforge/backend/svc-brief/internal/handler"
+	"github.com/videoforge/backend/svc-brief/internal/middleware"
+	"github.com/videoforge/backend/svc-brief/internal/repository"
+	"github.com/videoforge/backend/svc-brief/internal/service"
 )
 
 func main() {

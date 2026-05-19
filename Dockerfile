@@ -10,8 +10,8 @@ WORKDIR /workspace
 # Install git for module fetching
 RUN apk add --no-cache git ca-certificates
 
-# Copy workspace files
-COPY go.work go.work.sum* ./
+# Copy workspace files (without go.work — service go.mod handles deps via replace)
+COPY go.mod ./
 COPY pkg/ ./pkg/
 COPY svc-${SERVICE}/ ./svc-${SERVICE}/
 

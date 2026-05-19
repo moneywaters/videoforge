@@ -10,8 +10,8 @@ import (
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/middleware"
 
-	"svc-brief/internal/model"
-	"svc-brief/internal/service"
+	"github.com/videoforge/backend/svc-brief/internal/model"
+	"github.com/videoforge/backend/svc-brief/internal/service"
 )
 
 // BriefHandler handles brief HTTP requests
