@@ -127,8 +127,11 @@ type loggerKey struct{}
 func (l *Logger) Sync() error {
 	l.mu.Lock()
 	defer l.mu.Unlock()
-	if h, ok := l.logger.Handler().(slog.Handler); ok {
-		return h
+	type syncer interface {
+		Sync() error
+	}
+	if h, ok := l.logger.Handler().(syncer); ok {
+		return h.Sync()
 	}
 	return nil
 }

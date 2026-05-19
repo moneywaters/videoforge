@@ -17,6 +17,7 @@ COPY svc-${SERVICE}/ ./svc-${SERVICE}/
 
 # Build the service
 WORKDIR /workspace/svc-${SERVICE}
+ENV GOTOOLCHAIN=auto
 RUN go mod tidy && \
     CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server ./cmd/main.go
 

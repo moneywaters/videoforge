@@ -146,9 +146,9 @@ func WriteError(ctx context.Context, w http.ResponseWriter, err error) {
 		return
 	}
 
-	// For unknown errors, wrap as internal server error
+// For unknown errors, wrap as internal server error
 	// In production, we should not expose internal error details
-interal := Internal("An internal error occurred")
+	internal := Internal("An internal error occurred")
 	Write(ctx, w, internal)
 }
 
