@@ -92,9 +92,26 @@ func NewAuthMiddleware(config *AuthConfig) *AuthMiddleware {
 // Handler returns the auth handler
 func (m *AuthMiddleware) Handler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Skip auth in development if no key configured
+		// If no public key configured, still try to extract user context from token
 		if m.config == nil || m.config.PublicKeyStr == "" {
-			// Allow unauthenticated for development
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" {
+				parts := strings.Split(authHeader, " ")
+				if len(parts) == 2 && parts[0] == "Bearer" {
+					tokenStr := parts[1]
+					token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
+					if err == nil {
+						if claims, ok := token.Claims.(jwt.MapClaims); ok {
+							if sub, ok := claims["sub"].(string); ok && sub != "" {
+								role, _ := claims["role"].(string)
+								ctx := context.WithValue(r.Context(), UserIDKey, sub)
+								ctx = context.WithValue(ctx, UserRoleKey, role)
+								r = r.WithContext(ctx)
+							}
+						}
+					}
+				}
+			}
 			next.ServeHTTP(w, r)
 			return
 		}
