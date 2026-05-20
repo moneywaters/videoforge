@@ -125,6 +125,6 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 // wrapAuth wraps a handler with auth middleware
 func wrapAuth(auth *briefmiddleware.AuthMiddleware, handler http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		handler(w, r)
+		auth.Handler(handler).ServeHTTP(w, r)
 	}
 }
