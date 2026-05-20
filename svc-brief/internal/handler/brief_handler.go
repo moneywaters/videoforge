@@ -64,7 +64,7 @@ func (h *BriefHandler) HandleGetBrief(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -105,7 +105,7 @@ func (h *BriefHandler) HandleUpdateBrief(w http.ResponseWriter, r *http.Request)
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -208,7 +208,7 @@ func (h *BriefHandler) HandlePublishBrief(w http.ResponseWriter, r *http.Request
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -256,7 +256,7 @@ func (h *BriefHandler) HandleCloseBrief(w http.ResponseWriter, r *http.Request) 
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -284,7 +284,7 @@ func (h *BriefHandler) HandleInterview(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -357,7 +357,7 @@ func (h *BriefHandler) HandleViewBrief(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -404,7 +404,7 @@ func (h *BriefHandler) HandleGetRawFootageUploadURL(w http.ResponseWriter, r *ht
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -452,7 +452,7 @@ func (h *BriefHandler) HandleConfirmRawFootageUpload(w http.ResponseWriter, r *h
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -499,7 +499,7 @@ func (h *BriefHandler) HandleGetRawFootageDownloadURL(w http.ResponseWriter, r *
 	}
 
 	// Extract brief ID from path
-	idStr := extractPathVar(r, "id")
+	idStr := r.PathValue("id")
 	if idStr == "" {
 		errors.WriteError(ctx, w, errors.BadRequest("brief ID required"))
 		return
@@ -523,21 +523,6 @@ func (h *BriefHandler) HandleGetRawFootageDownloadURL(w http.ResponseWriter, r *
 }
 
 // Helper functions
-
-func extractPathVar(r *http.Request, key string) string {
-	// Simple path extraction - in production use gorilla/mux or chi
-	// For now, extract from URL path directly
-	path := r.URL.Path
-	for i := len(path) - 1; i >= 0; i-- {
-		if path[i] == '/' {
-			if i+1 < len(path) {
-				return path[i+1:]
-			}
-			break
-		}
-	}
-	return ""
-}
 
 func splitCSV(s string) []string {
 	if s == "" {
