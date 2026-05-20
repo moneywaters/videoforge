@@ -15,7 +15,6 @@ import (
 	"github.com/videoforge/backend/pkg/logger"
 	pkgmiddleware "github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/handler"
-	"github.com/videoforge/backend/svc-brief/internal/middleware"
 	"github.com/videoforge/backend/svc-brief/internal/repository"
 	"github.com/videoforge/backend/svc-brief/internal/service"
 
@@ -53,12 +52,12 @@ func main() {
 					token, _, err := new(jwt.Parser).ParseUnverified(tokenStr, jwt.MapClaims{})
 					if err == nil {
 						if claims, ok := token.Claims.(jwt.MapClaims); ok {
-							if sub, ok := claims["sub"].(string); ok && sub != "" {
-								role, _ := claims["role"].(string)
-								ctx := context.WithValue(r.Context(), middleware.UserIDKey, sub)
-								ctx = context.WithValue(ctx, middleware.UserRoleKey, role)
-								r = r.WithContext(ctx)
-							}
+								if sub, ok := claims["sub"].(string); ok && sub != "" {
+									role, _ := claims["role"].(string)
+									ctx := context.WithValue(r.Context(), pkgmiddleware.UserIDContextKey, sub)
+									ctx = context.WithValue(ctx, pkgmiddleware.UserRoleContextKey, role)
+									r = r.WithContext(ctx)
+									}
 						}
 					}
 				}
