@@ -38,6 +38,9 @@ type Storage interface {
 	// Returns an io.ReadCloser that must be closed by the caller.
 	GetObject(ctx context.Context, key string) (io.ReadCloser, error)
 
+	// CreateBucket creates the storage bucket if it does not exist.
+	CreateBucket(ctx context.Context) error
+
 	// FileExists is an alias for ObjectExists for compatibility.
 	FileExists(ctx context.Context, key string) (bool, error)
 }

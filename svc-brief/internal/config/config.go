@@ -132,6 +132,12 @@ func loadStorageConfig() StorageConfig {
 		} else {
 			cfg.Client = client
 			log.Println("Storage client initialized successfully")
+			// Ensure the bucket exists on Storj
+			if err := client.CreateBucket(context.Background()); err != nil {
+				log.Printf("Warning: failed to ensure bucket exists: %v", err)
+			} else {
+				log.Printf("Bucket %q ensured", storjConfig.Bucket)
+			}
 		}
 	} else {
 		log.Println("Storage credentials not configured, using mock storage")

@@ -82,6 +82,32 @@ func (s *storjStorage) DeleteObject(ctx context.Context, key string) error {
 	return nil
 }
 
+// CreateBucket creates the Storj bucket if it doesn't already exist.
+func (s *storjStorage) CreateBucket(ctx context.Context) error {
+	_, err := s.client.CreateBucket(ctx, &s3.CreateBucketInput{
+		Bucket: aws.String(s.config.Bucket),
+	})
+	if err != nil {
+		var alreadyExist *types.BucketAlreadyExists
+		var ownedByYou *types.BucketAlreadyOwnedByYou
+		if isBucketAlreadyExists(err, alreadyExist) || isBucketAlreadyExists(err, ownedByYou) {
+			return nil
+		}
+		return errors.Internal(fmt.Sprintf("failed to create bucket: %v", err))
+	}
+	return nil
+}
+
+func isBucketAlreadyExists(err error, target error) bool {
+	if err == nil || target == nil {
+		return false
+	}
+	errStr := err.Error()
+	return bytes.Contains([]byte(errStr), []byte("AlreadyExists")) ||
+		bytes.Contains([]byte(errStr), []byte("AlreadyOwned")) ||
+		bytes.Contains([]byte(errStr), []byte("BucketAlreadyExists"))
+}
+
 // ObjectExists checks if an object exists in the Storj bucket.
 func (s *storjStorage) ObjectExists(ctx context.Context, key string) (bool, error) {
 	if key == "" {
