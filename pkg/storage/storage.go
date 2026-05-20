@@ -89,8 +89,9 @@ func NewStorage(cfg StorjConfig) (Storage, error) {
 		return nil, errors.Internal(fmt.Sprintf("failed to load AWS config: %v", err))
 	}
 
-	// Create S3 client
+	// Create S3 client with custom Storj endpoint
 	client := s3.NewFromConfig(awsCfg, func(o *s3.Options) {
+		o.BaseEndpoint = &cfg.Endpoint
 		o.UsePathStyle = true
 	})
 
