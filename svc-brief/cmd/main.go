@@ -67,14 +67,6 @@ func main() {
 	}
 
 	mux := http.NewServeMux()
-	mux.HandleFunc("GET /debug-headers", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		uid := ""
-		if v, ok := r.Context().Value(pkgmiddleware.UserIDContextKey).(string); ok {
-			uid = v
-		}
-		fmt.Fprintf(w, `{"auth":"%s","user_id":"%s"}`, r.Header.Get("Authorization"), uid)
-	})
 	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
