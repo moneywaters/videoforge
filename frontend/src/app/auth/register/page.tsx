@@ -3,33 +3,54 @@
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
+import zxcvbn from 'zxcvbn';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { useAuthStore } from '@/stores/auth-store';
-import { api } from '@/lib/api';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import type { UserRole } from '@/types';
 
-const ROLE_OPTIONS = [
-  { value: 'client', label: 'Client' },
-  { value: 'editor', label: 'Editor' },
-  { value: 'ad_specialist', label: 'Ad Specialist' },
-];
+import { useAuthStore } from '@/stores/auth-store';
+import { api } from '@/lib/api';
 
 export default function RegisterPage() {
   const router = useRouter();
   const setUser = useAuthStore((state) => state.setUser);
   const { loginWithGoogle } = useAuthStore();
-  const [name, setName] = useState('');
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [passwordStrength, setPasswordStrength] = useState(0);
   const [confirmPassword, setConfirmPassword] = useState('');
   const [role, setRole] = useState<UserRole>('client');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+
+  const passwordStrengthLabels: Record<number, string> = {
+    0: 'Very Weak',
+    1: 'Very Weak',
+    2: 'Weak',
+    3: 'Fair',
+    4: 'Good',
+    5: 'Strong',
+  };
+  const strengthColors: Record<number, string> = {
+    0: 'bg-destructive',
+    1: 'bg-destructive',
+    2: 'bg-orange-500',
+    3: 'bg-yellow-500',
+    4: 'bg-green-500',
+    5: 'bg-green-500',
+  };
 
   const handleGoogleSignup = () => {
     loginWithGoogle();
@@ -44,16 +65,23 @@ export default function RegisterPage() {
       return;
     }
 
-    if (password.length < 6) {
-      setError('Password must be at least 6 characters');
+    if (password.length < 8) {
+      setError('Password must be at least 8 characters');
+      return;
+    }
+
+    if (firstName.trim() === '' || lastName.trim() === '') {
+      setError('First name and last name are required');
       return;
     }
 
     setIsLoading(true);
 
     try {
-      const user = await api.register(email, name, role);
-      setUser(user);
+      await api.register(email, password, firstName, lastName, role);
+      // Log the user in immediately so we have a session
+      const loginData = await api.login(email, password);
+      setUser(loginData);
       router.push('/onboarding');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Registration failed');
@@ -95,13 +123,25 @@ export default function RegisterPage() {
               </div>
             )}
             <div className='space-y-2'>
-              <Label htmlFor='name'>Full Name</Label>
+              <Label htmlFor='firstName'>First Name</Label>
               <Input
-                id='name'
+                id='firstName'
                 type='text'
-                placeholder='John Doe'
-                value={name}
-                onChange={(e) => setName(e.target.value)}
+                placeholder='John'
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                required
+                disabled={isLoading}
+              />
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='lastName'>Last Name</Label>
+              <Input
+                id='lastName'
+                type='text'
+                placeholder='Doe'
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
                 required
                 disabled={isLoading}
               />
@@ -119,31 +159,47 @@ export default function RegisterPage() {
               />
             </div>
             <div className='space-y-2'>
-              <Label htmlFor='role'>Role</Label>
-              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
-                <SelectTrigger id='role'>
-                  <SelectValue placeholder='Select a role' />
-                </SelectTrigger>
-                <SelectContent>
-                  {ROLE_OPTIONS.map((option) => (
-                    <SelectItem key={option.value} value={option.value}>
-                      {option.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-            <div className='space-y-2'>
               <Label htmlFor='password'>Password</Label>
               <Input
                 id='password'
                 type='password'
                 placeholder='Create a password'
                 value={password}
-                onChange={(e) => setPassword(e.target.value)}
+                onChange={(e) => {
+                  setPassword(e.target.value);
+                  setPasswordStrength(zxcvbn(e.target.value).score);
+                }}
                 required
                 disabled={isLoading}
               />
+              {password && (
+                <div className='space-y-1'>
+                  <div className='w-full h-2 rounded-full bg-muted overflow-hidden'>
+                    <div
+                      className={`h-full ${strengthColors[passwordStrength]} transition-all duration-300`}
+                      style={{ width: `${(passwordStrength / 5) * 100}%` }}
+                    />
+                  </div>
+                  <p className='text-sm text-muted-foreground'>
+                    Strength: {passwordStrengthLabels[passwordStrength]}
+                  </p>
+                </div>
+              )}
+            </div>
+            <div className='space-y-2'>
+              <Label htmlFor='role'>Role</Label>
+              <Select value={role} onValueChange={(value) => setRole(value as UserRole)}>
+                <SelectTrigger id='role'>
+                  <SelectValue placeholder='Select a role' />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value='client'>Client (Brand)</SelectItem>
+                  <SelectItem value='editor'>Editor / Creator</SelectItem>
+                  <SelectItem value='ad_specialist'>Ad Specialist</SelectItem>
+                  <SelectItem value='admin'>Admin</SelectItem>
+                  <SelectItem value='support_ai'>Support AI</SelectItem>
+                </SelectContent>
+              </Select>
             </div>
             <div className='space-y-2'>
               <Label htmlFor='confirmPassword'>Confirm Password</Label>

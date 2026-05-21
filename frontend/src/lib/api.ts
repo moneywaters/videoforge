@@ -84,15 +84,21 @@ export const api = {
 
   register: async (
     email: string,
-    name: string,
-    role: User['role']
-  ): Promise<User> => {
-    const data = await fetchWithAuth('/auth/register', {
+    password: string,
+    firstName: string,
+    lastName: string,
+    role: string
+  ): Promise<void> => {
+    await fetchWithAuth('/auth/register', {
       method: 'POST',
-      body: JSON.stringify({ email, name, role }),
+      body: JSON.stringify({
+        email,
+        password,
+        first_name: firstName,
+        last_name: lastName,
+        role,
+      }),
     });
-    localStorage.setItem('token', data.token);
-    return data.user;
   },
 
   logout: async (): Promise<void> => {

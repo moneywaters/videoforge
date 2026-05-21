@@ -36,9 +36,11 @@ type User struct {
 
 // RegisterRequest represents a registration request.
 type RegisterRequest struct {
-	Email    string `json:"email"`
-	Password string `json:"password"`
-	Name     string `json:"name,omitempty"`
+	Email     string `json:"email"`
+	Password  string `json:"password"`
+	FirstName string `json:"first_name,omitempty"`
+	LastName  string `json:"last_name,omitempty"`
+	Role      string `json:"role,omitempty"`
 }
 
 // LoginRequest represents a login request.
@@ -237,20 +239,44 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"error":"email and password are required"}`, http.StatusBadRequest)
 		return
 	}
+
+	// Validate role if provided
+	validRoles := map[string]bool{
+		"client":       true,
+		"editor":       true,
+		"ad_specialist": true,
+		"admin":        true,
+		"support_ai":   true,
+	}
+	role := req.Role
+	if role == "" {
+		role = "client"
+	} else if !validRoles[role] {
+		http.Error(w, `{"error":"invalid role"}`, http.StatusBadRequest)
+		return
+	}
+
 	hash, _ := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
-	var userID, role, status string
+	var userID, status string
 	err := pool.QueryRow(r.Context(),
 		`INSERT INTO users (email, password_hash, first_name, last_name, role, status) VALUES ($1,$2,$3,$4,$5,$6) RETURNING id, role, status`,
-		req.Email, string(hash), req.Name, "", "client", "active",
+		req.Email, string(hash), req.FirstName, req.LastName, role, "active",
 	).Scan(&userID, &role, &status)
 	if err != nil {
 		http.Error(w, `{"error":"user already exists or invalid"}`, http.StatusConflict)
 		return
 	}
+
+	// Construct name from first_name and last_name
+	name := req.FirstName
+	if req.LastName != "" {
+		name = req.FirstName + " " + req.LastName
+	}
+
 	token, _ := generateToken(userID)
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(http.StatusCreated)
-	json.NewEncoder(w).Encode(AuthResponse{Token: token, User: User{ID: userID, Email: req.Email, Name: req.Name, Role: role, Status: status}})
+	json.NewEncoder(w).Encode(AuthResponse{Token: token, User: User{ID: userID, Email: req.Email, Name: name, Role: role, Status: status}})
 }
 
 func handleLogin(w http.ResponseWriter, r *http.Request) {
