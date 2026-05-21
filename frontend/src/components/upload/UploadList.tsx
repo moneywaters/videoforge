@@ -1,3 +1,5 @@
+"use client";
+
 import { UploadItem, UploadFile } from './UploadItem';
 
 export interface UploadListProps {

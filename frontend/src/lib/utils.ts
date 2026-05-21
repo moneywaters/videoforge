@@ -1,32 +1,24 @@
-import { clsx, type ClassValue } from 'clsx';
+import { type ClassValue, clsx } from 'clsx';
 import { twMerge } from 'tailwind-merge';
 
-export function cn(...inputs: ClassValue[]): string {
+export function cn(...inputs: ClassValue[]) {
   return twMerge(clsx(inputs));
 }
 
-export function formatCurrency(amount: number): string {
-  return new Intl.NumberFormat('en-US', {
-    style: 'currency',
-    currency: 'USD',
-  }).format(amount);
-}
+export function formatBytes(
+  bytes: number,
+  opts: {
+    decimals?: number;
+    sizeType?: 'accurate' | 'normal';
+  } = {}
+) {
+  const { decimals = 0, sizeType = 'normal' } = opts;
 
-export function formatDate(date: string): string {
-  return new Date(date).toLocaleDateString('en-US', {
-    month: 'short',
-    day: 'numeric',
-    year: 'numeric',
-  });
-}
-
-export function formatDuration(seconds: number): string {
-  const minutes = Math.floor(seconds / 60);
-  const remainingSeconds = seconds % 60;
-  if (minutes >= 60) {
-    const hours = Math.floor(minutes / 60);
-    const remainingMinutes = minutes % 60;
-    return `${hours}:${remainingMinutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  }
-  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+  const sizes = ['Bytes', 'KB', 'MB', 'GB', 'TB'];
+  const accurateSizes = ['Bytes', 'KiB', 'MiB', 'GiB', 'TiB'];
+  if (bytes === 0) return '0 Byte';
+  const i = Math.floor(Math.log(bytes) / Math.log(1024));
+  return `${(bytes / Math.pow(1024, i)).toFixed(decimals)} ${
+    sizeType === 'accurate' ? (accurateSizes[i] ?? 'Bytest') : (sizes[i] ?? 'Bytes')
+  }`;
 }

@@ -1,4 +1,9 @@
-export type UserRole = 'client' | 'editor' | 'ad_specialist' | 'admin' | 'support_ai';
+export type UserRole =
+  | 'client'
+  | 'editor'
+  | 'ad_specialist'
+  | 'admin'
+  | 'support_ai';
 
 export interface User {
   id: string;
@@ -27,7 +32,19 @@ export interface Brief {
   deadline?: string;
 }
 
-export type VideoStatus = 'submitted' | 'approved' | 'rejected' | 'needs_revision';
+export type VideoStatus =
+  | 'submitted'
+  | 'approved'
+  | 'rejected'
+  | 'needs_revision';
+
+export interface VideoRevision {
+  id: string;
+  version: number;
+  url: string;
+  createdAt: string;
+  notes: string;
+}
 
 export interface Video {
   id: string;
@@ -43,14 +60,6 @@ export interface Video {
   submittedAt: string;
   revisions: VideoRevision[];
   feedback?: string;
-}
-
-export interface VideoRevision {
-  id: string;
-  version: number;
-  url: string;
-  createdAt: string;
-  notes?: string;
 }
 
 export interface LeaderboardEntry {
@@ -74,9 +83,9 @@ export interface Campaign {
   budget: number;
   spent: number;
   status: CampaignStatus;
-  startedAt?: string;
+  startedAt: string;
   endedAt?: string;
-  targetCpa?: number;
+  targetCpa: number;
 }
 
 export interface PerformanceMetric {
@@ -114,8 +123,8 @@ export interface EarningsSummary {
   totalPaidOut: number;
   pendingBalance: number;
   lifetimeSales: number;
-  tierProgress: number; // 0-500
-  feeRate: number; // 0 or 0.05
+  tierProgress: number;
+  feeRate: number;
 }
 
 export interface Notification {
@@ -140,7 +149,7 @@ export interface VideoLink {
   videoId: string;
   campaignId: string;
   url: string;
-  discountCode: string;
+  discountCode?: string;
   utmSource: string;
   utmMedium: string;
   utmCampaign: string;
@@ -157,7 +166,7 @@ export interface Dispute {
   targetName: string;
   reason: string;
   evidence: string[];
-  status: 'open' | 'under_review' | 'resolved';
+  status: 'open' | 'resolved';
   createdAt: string;
   resolvedAt?: string;
   resolution?: string;
@@ -165,7 +174,7 @@ export interface Dispute {
 
 export interface ModerationItem {
   id: string;
-  type: 'video' | 'brief' | 'comment';
+  type: 'video' | 'brief';
   contentId: string;
   flaggedBy: string;
   reason: string;
@@ -185,4 +194,25 @@ export interface OnboardingStep {
   title: string;
   description: string;
   completed: boolean;
+}
+
+export interface NavItem {
+  title: string;
+  url: string;
+  icon?: string;
+  shortcut?: string[];
+  isActive?: boolean;
+  items?: NavItem[];
+  access?: {
+    requireOrg?: boolean;
+    permission?: string;
+    role?: string;
+    plan?: string;
+    feature?: string;
+  };
+}
+
+export interface NavGroup {
+  label: string;
+  items: NavItem[];
 }

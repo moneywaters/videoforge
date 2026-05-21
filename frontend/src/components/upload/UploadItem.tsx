@@ -1,4 +1,6 @@
-import { File as FileIcon, FileVideo, X } from 'lucide-react';
+"use client";
+
+import { IconFile, IconVideo, IconX } from '@tabler/icons-react';
 
 export type UploadStatus = 'pending' | 'uploading' | 'completed' | 'error' | 'cancelled';
 
@@ -33,18 +35,18 @@ const statusColors: Record<UploadStatus, string> = {
 
 function getFileIcon(file: globalThis.File) {
   const isVideo = file.type?.startsWith('video/') ?? false;
-  return isVideo ? FileVideo : FileIcon;
+  return isVideo ? IconVideo : IconFile;
 }
 
 export function UploadItem({ upload, onCancel }: UploadItemProps) {
   const { id, file, progress, status, error } = upload;
-  const FileIcon = getFileIcon(file);
+  const FileDisplayIcon = getFileIcon(file);
   const showCancel = status === 'uploading';
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
       <div className="flex items-center gap-2">
-        <FileIcon className="w-5 h-5 flex-shrink-0 text-gray-400" />
+        <FileDisplayIcon className="w-5 h-5 flex-shrink-0 text-gray-400" />
         <span
           className="text-sm text-gray-700 truncate flex-1 min-w-0"
           title={file.name}
@@ -58,7 +60,7 @@ export function UploadItem({ upload, onCancel }: UploadItemProps) {
             aria-label="Cancel upload"
             className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
           >
-            <X className="w-3.5 h-3.5 text-gray-500" />
+            <IconX className="w-3.5 h-3.5 text-gray-500" />
           </button>
         )}
       </div>
