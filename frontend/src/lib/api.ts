@@ -594,6 +594,24 @@ const mockOnboardingSteps: OnboardingStep[] = [
   },
 ];
 
+// Transform backend snake_case brief response to frontend camelCase
+function transformBriefResponse(b: any): Brief {
+  return {
+    id: b.id ?? b.ID,
+    title: b.title ?? '',
+    description: b.description ?? '',
+    status: b.status ?? 'draft',
+    clientId: typeof b.client_id === 'string' ? b.client_id : b.clientId,
+    clientName: b.client_name ?? b.clientName ?? 'Client',
+    bountyBudget: typeof b.bounty_budget === 'number' ? b.bounty_budget : b.bountyBudget ?? 0,
+    submissionLimit: b.submission_limit ?? b.submissionLimit ?? 0,
+    currentSubmissions: b.current_submissions ?? b.currentSubmissions ?? 0,
+    tags: b.tags ?? [],
+    createdAt: b.created_at ?? b.createdAt ?? new Date().toISOString(),
+    deadline: b.deadline,
+  };
+}
+
 // API functions
 export const api = {
   // Auth
@@ -626,57 +644,88 @@ export const api = {
     }
   },
 
-  loginWithGoogle: async (): Promise<User> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Google OAuth: Simulating Google login popup...');
-    const googleUser: User = {
-      id: 'usr-google-001',
-      email: 'google.user@gmail.com',
-      name: 'Alex Google',
-      role: 'client',
-      avatar: 'https://ui-avatars.com/api/?name=Alex+Google&background=0D8ABC&color=fff',
-      createdAt: new Date().toISOString(),
-      onboardingComplete: false,
-    };
-    currentUser = googleUser;
-    return googleUser;
+  loginWithGoogle: async (): Promise<void> => {
+    // Redirect to backend Google OAuth endpoint
+    window.location.href = 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
   },
 
-  registerWithGoogle: async (): Promise<User> => {
-    await new Promise(resolve => setTimeout(resolve, 1000));
-    console.log('Google OAuth: Simulating Google register popup...');
-    const googleUser: User = {
-      id: 'usr-google-001',
-      email: 'google.user@gmail.com',
-      name: 'Alex Google',
-      role: 'client',
-      avatar: 'https://ui-avatars.com/api/?name=Alex+Google&background=0D8ABC&color=fff',
-      createdAt: new Date().toISOString(),
-      onboardingComplete: false,
-    };
-    mockUsers.push(googleUser);
-    currentUser = googleUser;
-    return googleUser;
+  registerWithGoogle: async (): Promise<void> => {
+    // Redirect to backend Google OAuth endpoint (same as login - backend handles registration)
+    window.location.href = 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
   },
 
   // Storj File Upload / Download endpoints
   getUploadUrl: async (briefId: string, filename: string, contentType: string): Promise<{ url: string; uploadId: string }> => {
-    return fetchWithAuth(`/briefs/${briefId}/raw-footage/upload-url`, {
+    const resp = await fetchWithAuth(`/briefs/${briefId}/raw-footage/upload-url`, {
       method: 'POST',
       body: JSON.stringify({ filename, contentType }),
     });
+    return {
+      url: resp.upload_url,
+      uploadId: resp.storj_key,
+    };
   },
 
   confirmUpload: async (briefId: string, uploadId: string): Promise<void> => {
     return fetchWithAuth(`/briefs/${briefId}/raw-footage/confirm`, {
       method: 'POST',
-      body: JSON.stringify({ uploadId }),
+      body: JSON.stringify({ storj_key: uploadId }),
     });
   },
 
   getDownloadUrl: async (briefId: string): Promise<{ url: string }> => {
     return fetchWithAuth(`/briefs/${briefId}/raw-footage/download-url`, {
       method: 'GET',
+    });
+  },
+
+  uploadToPresignedUrl: async (
+    url: string,
+    file: File,
+    options?: {
+      onProgress?: (loaded: number, total: number) => void;
+      signal?: AbortSignal;
+    }
+  ): Promise<void> => {
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('PUT', url);
+      xhr.setRequestHeader('Content-Type', file.type);
+
+      let onAbort: (() => void) | undefined;
+      if (options?.signal) {
+        if (options.signal.aborted) {
+          reject(new Error('Upload cancelled'));
+          return;
+        }
+        onAbort = () => {
+          xhr.abort();
+          reject(new Error('Upload cancelled'));
+        };
+        options.signal.addEventListener('abort', onAbort, { once: true });
+      }
+
+      xhr.upload.onprogress = (e) => {
+        if (e.lengthComputable && options?.onProgress) {
+          options.onProgress(e.loaded, e.total);
+        }
+      };
+
+      xhr.onload = () => {
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve();
+        } else {
+          reject(new Error(`Upload failed: ${xhr.status}`));
+        }
+      };
+
+      xhr.onerror = () => reject(new Error('Upload failed'));
+      xhr.onloadend = () => {
+        if (onAbort && options?.signal) {
+          options.signal.removeEventListener('abort', onAbort);
+        }
+      };
+      xhr.send(file);
     });
   },
 
@@ -687,33 +736,49 @@ export const api = {
 
   // Briefs
   getBriefs: async (): Promise<Brief[]> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    return mockBriefs;
+    const resp = await fetchWithAuth('/briefs');
+    // Backend returns { briefs: [...], page, limit, total, total_pages }
+    const briefs = Array.isArray(resp) ? resp : resp.briefs ?? [];
+    return briefs.map(transformBriefResponse);
   },
 
   getBrief: async (id: string): Promise<Brief | undefined> => {
-    await new Promise(resolve => setTimeout(resolve, 300));
-    return mockBriefs.find(b => b.id === id);
+    const resp = await fetchWithAuth(`/briefs/${id}`);
+    return transformBriefResponse(resp);
   },
 
   createBrief: async (brief: Omit<Brief, 'id' | 'createdAt' | 'currentSubmissions'>): Promise<Brief> => {
-    await new Promise(resolve => setTimeout(resolve, 500));
-    const newBrief: Brief = {
-      ...brief,
-      id: `brf-${uuid()}`,
-      createdAt: new Date().toISOString(),
-      currentSubmissions: 0,
-    };
-    mockBriefs.push(newBrief);
-    return newBrief;
+    const resp = await fetchWithAuth('/briefs', {
+      method: 'POST',
+      body: JSON.stringify({
+        title: brief.title,
+        description: brief.description,
+        goals: brief.description,
+        target_audience: '',
+        tone: '',
+        style_preferences: '',
+        cta: '',
+        bounty_budget: brief.bountyBudget,
+        submissions_limit: brief.submissionLimit,
+        is_blind: false,
+        tags: brief.tags,
+      }),
+    });
+    return transformBriefResponse(resp);
   },
 
   updateBrief: async (id: string, updates: Partial<Brief>): Promise<Brief> => {
-    await new Promise(resolve => setTimeout(resolve, 400));
-    const brief = mockBriefs.find(b => b.id === id);
-    if (!brief) throw new Error('Brief not found');
-    Object.assign(brief, updates);
-    return brief;
+    const body: Record<string, unknown> = {};
+    if (updates.title !== undefined) body.title = updates.title;
+    if (updates.description !== undefined) body.description = updates.description;
+    if (updates.bountyBudget !== undefined) body.bounty_budget = updates.bountyBudget;
+    if (updates.submissionLimit !== undefined) body.submissions_limit = updates.submissionLimit;
+    if (updates.tags !== undefined) body.tags = updates.tags;
+    const resp = await fetchWithAuth(`/briefs/${id}`, {
+      method: 'PATCH',
+      body: JSON.stringify(body),
+    });
+    return transformBriefResponse(resp);
   },
 
   // Videos

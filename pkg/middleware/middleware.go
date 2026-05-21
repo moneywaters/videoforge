@@ -122,41 +122,29 @@ func Logger(next http.Handler) http.Handler {
 	})
 }
 
-// CORS middleware adds basic CORS headers to responses.
-// It handles simple cross-origin requests and preflight requests.
+// CORS middleware adds cross-origin headers and handles preflight.
+// It mirrors the request's Origin when allowAll=true (required for credentialed requests).
 func CORS(origin string) func(next http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-			// Get the origin from the request
 			requestOrigin := r.Header.Get("Origin")
 
-			// Determine the allowed origin
+			// Determine allowed origin: echo caller's Origin if wildcard mode.
+			// Browsers reject ‘*’ when credentials are used (e.g. Authorization header).
 			allowedOrigin := origin
-			if origin == "*" {
-				// Allow any origin
-				allowedOrigin = "*"
-			} else if origin == "" {
-				// Use the request origin if no specific origin is set
+			if origin == "*" || origin == "" {
 				allowedOrigin = requestOrigin
 			}
 
-			// Set CORS headers
-			if allowedOrigin != "" && allowedOrigin != "*" {
+			if allowedOrigin != "" {
 				w.Header().Set("Access-Control-Allow-Origin", allowedOrigin)
-			} else if allowedOrigin == "*" {
-				w.Header().Set("Access-Control-Allow-Origin", "*")
+				w.Header().Add("Vary", "Origin")
 			}
 
-			// Allow credentials
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-
-			// Allow common methods
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
-
-			// Allow common headers
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-Request-ID, X-Requested-With")
 
-			// Handle preflight requests
 			if r.Method == "OPTIONS" {
 				w.WriteHeader(http.StatusNoContent)
 				return

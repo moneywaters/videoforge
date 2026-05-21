@@ -3,14 +3,34 @@ import { persist } from 'zustand/middleware';
 import type { User } from '@/types/index';
 import { api } from '@/lib/api';
 
+/**
+ * Decode a JWT token and extract the payload
+ */
+function decodeJWT(token: string): Record<string, unknown> {
+  try {
+    const base64Url = token.split('.')[1];
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(
+      atob(base64)
+        .split('')
+        .map((c) => '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2))
+        .join('')
+    );
+    return JSON.parse(jsonPayload);
+  } catch {
+    return {};
+  }
+}
+
 interface AuthState {
   user: User | null;
   isLoading: boolean;
   login: (email: string, password: string) => Promise<void>;
-  loginWithGoogle: () => Promise<void>;
-  registerWithGoogle: () => Promise<void>;
+  loginWithGoogle: () => void;
+  handleGoogleCallback: (token: string) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
+  setLoading: (loading: boolean) => void;
 }
 
 export const useAuthStore = create<AuthState>()(
@@ -28,31 +48,41 @@ export const useAuthStore = create<AuthState>()(
           throw error;
         }
       },
-      loginWithGoogle: async () => {
-        set({ isLoading: true });
-        try {
-          const user = await api.loginWithGoogle();
-          set({ user, isLoading: false });
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
-        }
+      loginWithGoogle: () => {
+        // Redirect to backend Google OAuth endpoint
+        window.location.href = 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
       },
-      registerWithGoogle: async () => {
-        set({ isLoading: true });
-        try {
-          const user = await api.registerWithGoogle();
-          set({ user, isLoading: false });
-        } catch (error) {
-          set({ isLoading: false });
-          throw error;
+      handleGoogleCallback: (token: string) => {
+        // Decode JWT and extract user claims
+        const payload = decodeJWT(token);
+
+        if (!payload.sub) {
+          console.error('Invalid token: missing sub claim');
+          return;
         }
+
+        const user: User = {
+          id: payload.sub as string,
+          email: (payload.email as string) || '',
+          name: (payload.name as string) || '',
+          role: (payload.role as User['role']) || 'client',
+          avatar: payload.picture ? (payload.picture as string) : undefined,
+          createdAt: new Date().toISOString(),
+          onboardingComplete: false, // Google users need to complete onboarding
+        };
+
+        // Store token in localStorage
+        localStorage.setItem('token', token);
+
+        // Set user in store
+        set({ user, isLoading: false });
       },
       logout: () => {
         api.logout();
         set({ user: null });
       },
       setUser: (user: User | null) => set({ user }),
+      setLoading: (loading: boolean) => set({ isLoading: loading }),
     }),
     {
       name: 'auth-storage',

@@ -6,25 +6,19 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
 import { useAuth } from '@/hooks/useAuth';
 
+const GOOGLE_AUTH_URL = 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
+
 export default function Login() {
   const navigate = useNavigate();
-  const { login, loginWithGoogle } = useAuth();
+  const { login } = useAuth();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGoogleLogin = async () => {
-    setError('');
-    setIsLoading(true);
-    try {
-      await loginWithGoogle();
-      navigate('/');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google login failed');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleGoogleLogin = () => {
+    // Redirect to backend Google OAuth endpoint
+    window.location.href = GOOGLE_AUTH_URL;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

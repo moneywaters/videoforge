@@ -5,7 +5,6 @@ import { Input } from '@/components/ui/Input';
 import { Button } from '@/components/ui/Button';
 import { Select } from '@/components/ui/Select';
 import { Card, CardBody, CardHeader, CardTitle, CardDescription } from '@/components/ui/Card';
-import { useAuth } from '@/hooks/useAuth';
 import { useAuthStore } from '@/stores/authStore';
 import { api } from '@/lib/api';
 import type { UserRole } from '@/types/index';
@@ -16,9 +15,10 @@ const ROLE_OPTIONS = [
   { value: 'ad_specialist', label: 'Ad Specialist' },
 ];
 
+const GOOGLE_AUTH_URL = 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
+
 export default function Register() {
   const navigate = useNavigate();
-  const { registerWithGoogle } = useAuth();
   const setUser = useAuthStore((state) => state.setUser);
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -28,17 +28,9 @@ export default function Register() {
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleGoogleSignup = async () => {
-    setError('');
-    setIsLoading(true);
-    try {
-      await registerWithGoogle();
-      navigate('/onboarding');
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Google signup failed');
-    } finally {
-      setIsLoading(false);
-    }
+  const handleGoogleSignup = () => {
+    // Redirect to backend Google OAuth endpoint (same as login - backend handles registration)
+    window.location.href = GOOGLE_AUTH_URL;
   };
 
   const handleSubmit = async (e: React.FormEvent) => {

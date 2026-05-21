@@ -1,11 +1,13 @@
-import { useState } from 'react';
+import { useState, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
 import { Badge } from '@/components/ui/Badge';
 import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Skeleton } from '@/components/ui/Skeleton';
+import { UploadList } from '@/components/upload/UploadList';
+import type { UploadFile } from '@/components/upload/UploadItem';
 import type { BriefStatus, Video } from '@/types/index';
 
 const statusBadgeVariant = (status: BriefStatus) => {
@@ -49,13 +51,19 @@ function SubmissionItem({ video }: { video: Video }) {
   );
 }
 
+interface UploadController {
+  abortController: AbortController;
+}
+
 export function BriefDetail() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
+  const uploadControllersRef = useRef<Map<string, UploadController>>(new Map());
 
-  const [uploading, setUploading] = useState(false);
-  const [uploadProgress, setUploadProgress] = useState(0);
+  const [uploads, setUploads] = useState<UploadFile[]>([]);
+
+  const isUploading = uploads.some((u) => u.status === 'uploading');
 
   const { data: brief, isLoading: briefLoading } = useQuery({
     queryKey: ['brief', id],
@@ -69,61 +77,93 @@ export function BriefDetail() {
     enabled: !!id,
   });
 
-  const uploadMutation = useMutation({
-    mutationFn: async (file: File) => {
-      setUploading(true);
-      setUploadProgress(0);
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    if (files.length === 0) return;
+    if (!id) return;
+
+    const newUploads: UploadFile[] = files.map((file) => ({
+      id: crypto.randomUUID(),
+      file,
+      progress: 0,
+      status: 'pending',
+    }));
+
+    setUploads((prev) => [...prev, ...newUploads]);
+
+    let anyCompleted = false;
+    const errors: string[] = [];
+
+    for (const uploadItem of newUploads) {
+      const uploadId = uploadItem.id;
+      const file = uploadItem.file;
+
+      const abortController = new AbortController();
+      uploadControllersRef.current.set(uploadId, { abortController });
+
+      setUploads((prev) =>
+        prev.map((u) =>
+          u.id === uploadId ? { ...u, status: 'uploading' } : u
+        )
+      );
+
       try {
-        // 1. Get presigned URL
-        const { url, uploadId } = await api.getUploadUrl(id!, file.name, file.type);
-        
-        // 2. Upload directly to Storj via presigned URL with progress
-        await new Promise<void>((resolve, reject) => {
-          const xhr = new XMLHttpRequest();
-          xhr.open('PUT', url);
-          xhr.setRequestHeader('Content-Type', file.type);
-          
-          xhr.upload.onprogress = (e) => {
-            if (e.lengthComputable) {
-              setUploadProgress(Math.round((e.loaded / e.total) * 100));
-            }
-          };
-          
-          xhr.onload = () => {
-            if (xhr.status >= 200 && xhr.status < 300) {
-              resolve();
-            } else {
-              reject(new Error(`Upload failed with status ${xhr.status}`));
-            }
-          };
-          
-          xhr.onerror = () => reject(new Error('Upload failed'));
-          xhr.send(file);
+        const { url, uploadId: storjKey } = await api.getUploadUrl(id, file.name, file.type);
+
+        if (!url) {
+          throw new Error('Failed to get upload URL');
+        }
+
+        await api.uploadToPresignedUrl(url, file, {
+          signal: abortController.signal,
+          onProgress: (loaded, total) => {
+            const progress = Math.round((loaded / total) * 100);
+            setUploads((prev) =>
+              prev.map((u) =>
+                u.id === uploadId ? { ...u, progress } : u
+              )
+            );
+          },
         });
 
-        // 3. Confirm upload
-        await api.confirmUpload(id!, uploadId);
+        await api.confirmUpload(id, storjKey);
+
+        anyCompleted = true;
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId ? { ...u, status: 'completed', progress: 100 } : u
+          )
+        );
+      } catch (error) {
+        const isCancelled =
+          error instanceof Error && error.message === 'Upload cancelled';
+        setUploads((prev) =>
+          prev.map((u) =>
+            u.id === uploadId
+              ? {
+                  ...u,
+                  status: isCancelled ? 'cancelled' : 'error',
+                  error: isCancelled ? undefined : error instanceof Error ? error.message : 'Upload failed',
+                }
+              : u
+          )
+        );
+        if (!isCancelled) {
+          errors.push(error instanceof Error ? error.message : 'Unknown error');
+        }
       } finally {
-        setUploading(false);
-        setUploadProgress(0);
+        uploadControllersRef.current.delete(uploadId);
       }
-    },
-    onSuccess: () => {
+    }
+
+    if (anyCompleted) {
       queryClient.invalidateQueries({ queryKey: ['videos', 'brief', id] });
       alert('Upload successful!');
-    },
-    onError: (error: Error) => {
-      alert(`Upload failed: ${error.message}`);
     }
-  });
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0];
-    if (file) {
-      uploadMutation.mutate(file);
+    if (errors.length > 0) {
+      alert(`Some uploads failed:\n${errors.join('\n')}`);
     }
-    // reset input
-    e.target.value = '';
   };
 
   const handleDownload = async () => {
@@ -132,6 +172,21 @@ export function BriefDetail() {
       window.open(url, '_blank', 'noopener,noreferrer');
     } catch (error: unknown) {
       alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    }
+  };
+
+  const handleCancel = (uploadId: string) => {
+    const controller = uploadControllersRef.current.get(uploadId);
+    if (controller) {
+      controller.abortController.abort();
+      setUploads((prev) =>
+        prev.map((u) =>
+          u.id === uploadId ? { ...u, status: 'cancelled' } : u
+        )
+      );
+      setTimeout(() => {
+        setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+      }, 500);
     }
   };
 
@@ -201,16 +256,17 @@ export function BriefDetail() {
         
         <div className="flex gap-4 pt-4 border-t border-gray-100">
            <div>
-             <input
-               type="file"
-               id="upload-footage"
-               className="hidden"
-               onChange={handleFileChange}
-               disabled={uploading}
-             />
+              <input
+                type="file"
+                id="upload-footage"
+                multiple
+                className="hidden"
+                onChange={handleFileChange}
+                disabled={isUploading}
+              />
              <label htmlFor="upload-footage" className="cursor-pointer inline-block">
-               <div className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${uploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}>
-                 {uploading ? `Uploading... ${uploadProgress}%` : 'Upload Raw Footage'}
+               <div className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${isUploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}>
+                 {isUploading ? 'Uploading…' : 'Upload Raw Footage'}
                </div>
              </label>
            </div>
@@ -218,6 +274,12 @@ export function BriefDetail() {
              Download Raw Footage
            </Button>
         </div>
+
+        {uploads.length > 0 && (
+          <div className="mt-4">
+            <UploadList uploads={uploads} onCancel={handleCancel} />
+          </div>
+        )}
       </div>
 
       <Card>

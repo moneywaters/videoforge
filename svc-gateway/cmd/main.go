@@ -67,7 +67,8 @@ func main() {
 		middleware.RequestID,
 		middleware.Recover,
 		middleware.Logger,
-		middleware.CORS("*"),
+		// CORS is handled by the individual backend services (user, brief, etc.)
+		// DO NOT add CORS here to avoid duplicate headers from proxy → backend
 	)
 
 	server := &http.Server{

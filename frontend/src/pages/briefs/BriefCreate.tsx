@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/Button';
 import { Card, CardBody, CardHeader, CardTitle } from '@/components/ui/Card';
 import { Input } from '@/components/ui/Input';
 import { Textarea } from '@/components/ui/Textarea';
+import { useAuth } from '@/hooks/useAuth';
 import type { Brief } from '@/types/index';
 
 interface ChatMessage {
@@ -36,6 +37,16 @@ type FormData = {
 
 export function BriefCreate() {
   const navigate = useNavigate();
+  const { user } = useAuth();
+  
+  // Auth guard: redirect to login after a warning
+  useEffect(() => {
+    if (!user) {
+      alert('You must be signed in to create a brief. Redirecting to login...');
+      navigate('/login', { state: { redirectAfterLogin: '/briefs/new' } });
+    }
+  }, [user, navigate]);
+
   const [step, setStep] = useState<'form' | 'interview'>('form');
   const [formData, setFormData] = useState<FormData>({
     title: '',
@@ -73,6 +84,9 @@ export function BriefCreate() {
     mutationFn: (data: Omit<Brief, 'id' | 'createdAt' | 'currentSubmissions'>) => api.createBrief(data),
     onSuccess: (newBrief) => {
       navigate(`/briefs/${newBrief.id}`);
+    },
+    onError: (error: Error) => {
+      alert(`Failed to create brief: ${error.message}`);
     },
   });
 

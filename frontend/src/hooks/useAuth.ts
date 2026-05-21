@@ -5,7 +5,6 @@ export function useAuth() {
   const isLoading = useAuthStore((state) => state.isLoading);
   const login = useAuthStore((state) => state.login);
   const loginWithGoogle = useAuthStore((state) => state.loginWithGoogle);
-  const registerWithGoogle = useAuthStore((state) => state.registerWithGoogle);
   const logout = useAuthStore((state) => state.logout);
 
   return {
@@ -13,7 +12,6 @@ export function useAuth() {
     isLoading,
     login,
     loginWithGoogle,
-    registerWithGoogle,
     logout,
     isAdmin: user?.role === 'admin',
     isClient: user?.role === 'client',
