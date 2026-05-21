@@ -3,7 +3,7 @@ import { withSentryConfig } from '@sentry/nextjs';
 
 // Define the base Next.js configuration
 const baseConfig: NextConfig = {
-  output: process.env.BUILD_STANDALONE === 'true' ? 'standalone' : undefined,
+  // output: 'standalone', // Commented out - Vercel default handles this
   images: {
     remotePatterns: [
       {
