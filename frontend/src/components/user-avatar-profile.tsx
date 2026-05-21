@@ -1,29 +1,43 @@
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import type { User } from '@/types';
 
 interface UserAvatarProfileProps {
   className?: string;
   showInfo?: boolean;
-  user: {
-    imageUrl?: string;
-    fullName?: string | null;
-    emailAddresses: Array<{ emailAddress: string }>;
-  } | null;
+  user: User | null | undefined;
 }
 
 export function UserAvatarProfile({ className, showInfo = false, user }: UserAvatarProfileProps) {
+  if (!user) {
+    return (
+      <div className='flex items-center gap-2'>
+        <Avatar className={className}>
+          <AvatarImage src='' alt='Guest' />
+          <AvatarFallback className='rounded-lg'>GN</AvatarFallback>
+        </Avatar>
+        {showInfo && (
+          <div className='grid flex-1 text-left text-sm leading-tight'>
+            <span className='truncate font-semibold'>Guest User</span>
+            <span className='truncate text-xs'>Not signed in</span>
+          </div>
+        )}
+      </div>
+    );
+  }
+
   return (
     <div className='flex items-center gap-2'>
       <Avatar className={className}>
-        <AvatarImage src={user?.imageUrl || ''} alt={user?.fullName || ''} />
+        <AvatarImage src={user.avatar || ''} alt={user.name} />
         <AvatarFallback className='rounded-lg'>
-          {user?.fullName?.slice(0, 2)?.toUpperCase() || 'CN'}
+          {user.name.slice(0, 2)?.toUpperCase() || 'U'}
         </AvatarFallback>
       </Avatar>
 
       {showInfo && (
         <div className='grid flex-1 text-left text-sm leading-tight'>
-          <span className='truncate font-semibold'>{user?.fullName || ''}</span>
-          <span className='truncate text-xs'>{user?.emailAddresses[0].emailAddress || ''}</span>
+          <span className='truncate font-semibold'>{user.name}</span>
+          <span className='truncate text-xs'>{user.email}</span>
         </div>
       )}
     </div>

@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import { persist } from 'zustand/middleware';
+import { persist, createJSONStorage } from 'zustand/middleware';
 import type { User } from '@/types';
 
 function decodeJWT(token: string): Record<string, unknown> {
@@ -21,28 +21,40 @@ function decodeJWT(token: string): Record<string, unknown> {
 interface AuthState {
   user: User | null;
   isLoading: boolean;
+  _hasHydrated: boolean;
   login: (email: string, password: string) => Promise<void>;
   loginWithGoogle: () => void;
   handleGoogleCallback: (token: string) => void;
   logout: () => void;
   setUser: (user: User | null) => void;
   setLoading: (loading: boolean) => void;
+  setHasHydrated: (hasHydrated: boolean) => void;
+}
+
+// SSR-safe localStorage access
+function getLocalStorage(): Storage | null {
+  if (typeof window === 'undefined') return null;
+  return localStorage;
 }
 
 export const useAuthStore = create<AuthState>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       user: null,
       isLoading: false,
+      _hasHydrated: false,
       login: async (_email: string, _password: string) => {
         throw new Error('Not implemented');
       },
       loginWithGoogle: () => {
-        window.location.href = process.env.NEXT_PUBLIC_API_URL
+        if (typeof window === 'undefined') return;
+        const targetUrl = process.env.NEXT_PUBLIC_API_URL
           ? `${process.env.NEXT_PUBLIC_API_URL}/auth/google/login`
           : 'https://videoforge-gateway.fly.dev/api/v1/auth/google/login';
+        window.location.href = targetUrl;
       },
       handleGoogleCallback: (token: string) => {
+        if (typeof window === 'undefined') return;
         const payload = decodeJWT(token);
         if (!payload.sub) {
           console.error('Invalid token: missing sub claim');
@@ -57,22 +69,39 @@ export const useAuthStore = create<AuthState>()(
           createdAt: new Date().toISOString(),
           onboardingComplete: false,
         };
-        localStorage.setItem('token', token);
+        getLocalStorage()?.setItem('token', token);
         set({ user, isLoading: false });
       },
       logout: () => {
-        localStorage.removeItem('token');
+        getLocalStorage()?.removeItem('token');
         set({ user: null });
       },
       setUser: (user: User | null) => set({ user }),
       setLoading: (loading: boolean) => set({ isLoading: loading }),
+      setHasHydrated: (hasHydrated: boolean) => set({ _hasHydrated: hasHydrated }),
     }),
     {
       name: 'auth-storage',
       partialize: (state) => ({ user: state.user }),
+      skipHydration: true,
+      storage: createJSONStorage(() => {
+        if (typeof window === 'undefined') {
+          return {
+            getItem: () => null,
+            setItem: () => {},
+            removeItem: () => {},
+          };
+        }
+        return localStorage;
+      }),
+      onRehydrateStorage: () => (state) => {
+        state?.setHasHydrated(true);
+      },
     }
   )
 );
+
+export const hasHydrated = () => useAuthStore.getState()._hasHydrated;
 
 export const isAdmin = (): boolean =>
   useAuthStore.getState().user?.role === 'admin';

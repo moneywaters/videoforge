@@ -1,7 +1,10 @@
 import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { GitHubStarsButton } from '@/components/github-stars-button';
 import { cn } from '@/lib/utils';
-import { SignIn as ClerkSignInForm } from '@clerk/nextjs';
+import { useAuthStore } from '@/stores/auth-store';
+import { Icons } from '@/components/icons';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import { InteractiveGridPattern } from './interactive-grid';
@@ -66,18 +69,48 @@ export default function SignInViewPage() {
             variant='outline'
             size='default'
           />
-          <ClerkSignInForm
-            initialValues={{
-              emailAddress: 'your_mail+clerk_test@example.com'
-            }}
-          />
+          <Card className='w-full max-w-sm'>
+            <CardHeader>
+              <CardTitle>Sign In</CardTitle>
+              <CardDescription>
+                Welcome back! Please sign in to continue.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              <Button
+                className='w-full'
+                onClick={() => useAuthStore.getState().loginWithGoogle()}
+              >
+                <Icons.google className='mr-2 h-4 w-4' />
+                Continue with Google
+              </Button>
+              <div className='relative'>
+                <div className='absolute inset-0 flex items-center'>
+                  <span className='w-full border-t' />
+                </div>
+                <div className='relative flex justify-center text-xs uppercase'>
+                  <span className='bg-background text-muted-foreground px-2'>
+                    Or
+                  </span>
+                </div>
+              </div>
+              <div className='text-center text-sm'>
+                <Link
+                  href='/auth/login'
+                  className='hover:text-primary underline underline-offset-4'
+                >
+                  Sign in with email
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
           <div className='text-muted-foreground space-y-2 px-8 text-center text-xs'>
             <p>
               This is an{' '}
               <Link href='/about' className='hover:text-primary underline underline-offset-4'>
                 open-source project
               </Link>{' '}
-              for demo purposes. Authentication is handled securely by Clerk.
+              for demo purposes.
             </p>
             <p>
               <Link

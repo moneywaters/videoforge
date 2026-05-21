@@ -1,6 +1,8 @@
 import { buttonVariants } from '@/components/ui/button';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
-import { SignUp as ClerkSignUpForm } from '@clerk/nextjs';
+import { useAuthStore } from '@/stores/auth-store';
 import { GitHubLogoIcon } from '@radix-ui/react-icons';
 import { Icons } from '@/components/icons';
 import { Metadata } from 'next';
@@ -13,6 +15,7 @@ export const metadata: Metadata = {
 };
 
 export default function SignUpViewPage({ stars }: { stars: number }) {
+  const loginWithGoogle = useAuthStore.getState().loginWithGoogle;
   return (
     <div className='relative h-screen flex-col items-center justify-center md:grid lg:max-w-none lg:grid-cols-2 lg:px-0'>
       <Link
@@ -77,18 +80,48 @@ export default function SignUpViewPage({ stars }: { stars: number }) {
               <span className='font-display font-medium'>{stars}</span>
             </div>
           </Link>
-          <ClerkSignUpForm
-            initialValues={{
-              emailAddress: 'your_mail+clerk_test@example.com'
-            }}
-          />
+          <Card className='w-full max-w-sm'>
+            <CardHeader>
+              <CardTitle>Sign Up</CardTitle>
+              <CardDescription>
+                Create an account to get started.
+              </CardDescription>
+            </CardHeader>
+            <CardContent className='space-y-4'>
+              <Button
+                className='w-full'
+                onClick={loginWithGoogle}
+              >
+                <Icons.google className='mr-2 h-4 w-4' />
+                Continue with Google
+              </Button>
+              <div className='relative'>
+                <div className='absolute inset-0 flex items-center'>
+                  <span className='w-full border-t' />
+                </div>
+                <div className='relative flex justify-center text-xs uppercase'>
+                  <span className='bg-background text-muted-foreground px-2'>
+                    Or
+                  </span>
+                </div>
+              </div>
+              <div className='text-center text-sm'>
+                <Link
+                  href='/auth/register'
+                  className='hover:text-primary underline underline-offset-4'
+                >
+                  Sign up with email
+                </Link>
+              </div>
+            </CardContent>
+          </Card>
           <div className='text-muted-foreground space-y-2 px-8 text-center text-xs'>
             <p>
               This is an{' '}
               <Link href='/about' className='hover:text-primary underline underline-offset-4'>
                 open-source project
               </Link>{' '}
-              for demo purposes. Authentication is handled securely by Clerk.
+              for demo purposes.
             </p>
             <p>
               <Link

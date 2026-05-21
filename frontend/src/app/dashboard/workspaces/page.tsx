@@ -1,28 +1,25 @@
 'use client';
 
 import PageContainer from '@/components/layout/page-container';
-import { OrganizationList } from '@clerk/nextjs';
-import { workspacesInfoContent } from '@/config/infoconfig';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 
 export default function WorkspacesPage() {
   return (
-    <PageContainer
-      pageTitle='Workspaces'
-      pageDescription='Manage your workspaces and switch between them'
-      infoContent={workspacesInfoContent}
-    >
-      <OrganizationList
-        appearance={{
-          elements: {
-            organizationListBox: 'space-y-2',
-            organizationPreview: 'rounded-lg border p-4 hover:bg-accent',
-            organizationPreviewMainIdentifier: 'text-lg font-semibold',
-            organizationPreviewSecondaryIdentifier: 'text-sm text-muted-foreground'
-          }
-        }}
-        afterSelectOrganizationUrl='/dashboard/workspaces/team'
-        afterCreateOrganizationUrl='/dashboard/workspaces/team'
-      />
+    <PageContainer pageTitle='Workspaces' pageDescription='Manage your workspaces and switch between them'>
+      <Card className='max-w-md'>
+        <CardHeader>
+          <CardTitle>Workspaces Coming Soon</CardTitle>
+        </CardHeader>
+        <CardContent>
+          <p className='text-muted-foreground'>
+            Workspace management is coming soon. Create and manage your teams with ease!
+          </p>
+          <Button className='mt-4' onClick={() => window.history.back()}>
+            Go Back
+          </Button>
+        </CardContent>
+      </Card>
     </PageContainer>
   );
 }
