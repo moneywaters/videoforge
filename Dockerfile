@@ -3,7 +3,7 @@
 ARG SERVICE
 
 # Build stage
-FROM golang:1.25-alpine AS builder
+FROM golang:1.24-alpine AS builder
 ARG SERVICE
 WORKDIR /workspace
 
@@ -43,6 +43,7 @@ COPY svc-user/ ./svc-user/
 COPY svc-video/ ./svc-video/
 
 # Build the service (from workspace root so go.work is used)
+ENV GOTOOLCHAIN=auto
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server ./svc-${SERVICE}/cmd/main.go
 
 # Final stage
