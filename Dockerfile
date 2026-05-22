@@ -43,7 +43,6 @@ COPY svc-user/ ./svc-user/
 COPY svc-video/ ./svc-video/
 
 # Build the service (from workspace root so go.work is used)
-ENV GOTOOLCHAIN=local
 RUN CGO_ENABLED=0 GOOS=linux go build -ldflags="-w -s" -o /app/server ./svc-${SERVICE}/cmd/main.go
 
 # Final stage

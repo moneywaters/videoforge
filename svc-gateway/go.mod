@@ -1,6 +1,6 @@
 module github.com/videoforge/backend/svc-gateway
 
-go 1.25.0
+go 1.25
 
 require (
 	github.com/golang-jwt/jwt/v5 v5.2.0
