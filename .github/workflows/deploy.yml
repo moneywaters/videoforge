@@ -16,41 +16,27 @@ jobs:
       packages: write
       id-token: write
     strategy:
+      fail-fast: false
       matrix:
         service:
           - name: user
             fly_app: videoforge-user
-            fly_toml: fly-user.toml
           - name: gateway
             fly_app: videoforge-gateway
-            fly_toml: fly-gateway.toml
           - name: brief
             fly_app: videoforge-brief
-            fly_toml: svc-brief/fly.toml
           - name: video
             fly_app: videoforge-video
-            fly_toml: svc-video/fly.toml
           - name: campaign
             fly_app: videoforge-campaign
-            fly_toml: svc-campaign/fly.toml
           - name: shopify
             fly_app: videoforge-shopify
-            fly_toml: svc-shopify/fly.toml
           - name: performance
             fly_app: videoforge-performance
-            fly_toml: svc-performance/fly.toml
-          - name: payout
-            fly_app: videoforge-payout
-            fly_toml: svc-payout/fly.toml
           - name: notification
             fly_app: videoforge-notification
-            fly_toml: svc-notification/fly.toml
-          - name: ai-support
-            fly_app: videoforge-ai-support
-            fly_toml: svc-ai-support/fly.toml
           - name: admin
             fly_app: videoforge-admin
-            fly_toml: svc-admin/fly.toml
     concurrency:
       group: deploy-${{ matrix.service.fly_app }}
       cancel-in-progress: false
@@ -87,42 +73,22 @@ jobs:
           cache-from: type=gha
           cache-to: type=gha,mode=max
 
+      - name: Copy fly.toml to workspace root
+        run: cp svc-${{ matrix.service.name }}/fly.toml ./fly-temp.toml
+
+      - name: Fix fly.toml dockerfile path
+        run: |
+          sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-temp.toml
+
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
       - name: Deploy to Fly.io
         run: |
-          flyctl deploy --config ${{ matrix.service.fly_toml }} --image ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ github.sha }}
+          flyctl deploy --config ./fly-temp.toml --app ${{ matrix.service.fly_app }} --image ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ github.sha }}
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
-  deploy-frontend:
-    runs-on: ubuntu-latest
-    needs: build-and-deploy-backend
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@v4
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22'
-          cache: 'npm'
-          cache-dependency-path: frontend/package-lock.json
-
-      - name: Install dependencies
-        run: cd frontend && npm ci
-
-      - name: Build frontend
-        run: cd frontend && npm run build
-        env:
-          NEXT_PUBLIC_API_URL: ${{ secrets.NEXT_PUBLIC_API_URL }}
-
-      - name: Deploy to Vercel
-        uses: amondnet/vercel-action@v25
-        with:
-          vercel-token: ${{ secrets.VERCEL_TOKEN }}
-          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
-          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
-          working-directory: ./frontend
-          vercel-args: '--prod'
+  # NOTE: Frontend is deployed automatically by Vercel GitHub integration
+  # No manual deploy step needed - Vercel monitors the frontend/ directory
+  # and deploys on every push to main.

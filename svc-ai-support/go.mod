@@ -10,4 +10,4 @@ require (
 	github.com/videoforge/backend v0.0.0
 )
 
-replace github.com/videoforge/backend => ../backend
+replace github.com/videoforge/backend => ../
