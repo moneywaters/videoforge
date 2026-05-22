@@ -4,83 +4,33 @@ on:
   push:
     branches: [main]
 
-env:
-  REGISTRY: ghcr.io
-  IMAGE_NAME: video-forge
-
 jobs:
-  build-and-deploy-backend:
+  deploy-backend:
     runs-on: ubuntu-latest
-    permissions:
-      contents: read
-      packages: write
-      id-token: write
     strategy:
       fail-fast: false
       matrix:
-        # NOTE: only deploy services that compile (don't use broken natsclient)
-        # Broken services (natsclient API vs nats.go v1.31 mismatch):
-        # video, shopify, campaign, notification, admin, performance, payout, ai-support
-        # TODO: fix pkg/natsclient/natsclient.go or upgrade nats.go to v1.34+
         service:
           - name: user
-            fly_app: videoforge-user
+            app: videoforge-user
           - name: gateway
-            fly_app: videoforge-gateway
+            app: videoforge-gateway
           - name: brief
-            fly_app: videoforge-brief
-    concurrency:
-      group: deploy-${{ matrix.service.fly_app }}
-      cancel-in-progress: false
+            app: videoforge-brief
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
 
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GitHub Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata (tags, labels)
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./Dockerfile
-          build-args: |
-            SERVICE=${{ matrix.service.name }}
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-      - name: Copy fly.toml to workspace root
-        run: cp svc-${{ matrix.service.name }}/fly.toml ./fly-temp.toml
-
-      - name: Fix fly.toml dockerfile path
-        run: |
-          sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-temp.toml
-
       - name: Setup flyctl
         uses: superfly/flyctl-actions/setup-flyctl@master
 
-      - name: Deploy to Fly.io
+      - name: Copy fly.toml to workspace root and fix paths
         run: |
-          flyctl deploy --config ./fly-temp.toml --app ${{ matrix.service.fly_app }} --image ${{ env.REGISTRY }}/${{ github.repository }}/${{ matrix.service.name }}:${{ github.sha }}
+          cp svc-${{ matrix.service.name }}/fly.toml ./fly-${{ matrix.service.name }}.toml
+          sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-${{ matrix.service.name }}.toml
+          sed -i 's|app = ".*"|app = "${{ matrix.service.app }}"|' ./fly-${{ matrix.service.name }}.toml
+
+      - name: Deploy to Fly.io
+        run: flyctl deploy --config ./fly-${{ matrix.service.name }}.toml --yes
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
-
-  # NOTE: Frontend is deployed automatically by Vercel GitHub integration
-  # No manual deploy step needed - Vercel monitors the frontend/ directory
-  # and deploys on every push to main.
