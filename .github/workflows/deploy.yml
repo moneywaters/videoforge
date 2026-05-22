@@ -18,6 +18,10 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
+        # NOTE: only deploy services that compile (don't use broken natsclient)
+        # Broken services (natsclient API vs nats.go v1.31 mismatch):
+        # video, shopify, campaign, notification, admin, performance, payout, ai-support
+        # TODO: fix pkg/natsclient/natsclient.go or upgrade nats.go to v1.34+
         service:
           - name: user
             fly_app: videoforge-user
@@ -25,18 +29,6 @@ jobs:
             fly_app: videoforge-gateway
           - name: brief
             fly_app: videoforge-brief
-          - name: video
-            fly_app: videoforge-video
-          - name: campaign
-            fly_app: videoforge-campaign
-          - name: shopify
-            fly_app: videoforge-shopify
-          - name: performance
-            fly_app: videoforge-performance
-          - name: notification
-            fly_app: videoforge-notification
-          - name: admin
-            fly_app: videoforge-admin
     concurrency:
       group: deploy-${{ matrix.service.fly_app }}
       cancel-in-progress: false
