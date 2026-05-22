@@ -1,0 +1,16 @@
+go 1.24
+
+use (
+	./pkg
+	./svc-gateway
+	./svc-user
+	./svc-brief
+	./svc-video
+	./svc-campaign
+	./svc-shopify
+	./svc-performance
+	./svc-payout
+	./svc-notification
+	./svc-admin
+	./svc-ai-support
+)

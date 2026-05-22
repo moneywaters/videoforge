@@ -6,12 +6,12 @@ ARG SERVICE
 FROM golang:1.24-alpine AS builder
 ARG SERVICE
 WORKDIR /workspace
-
 # Install git for module fetching
 RUN apk add --no-cache git ca-certificates
 
 # Copy Go workspace files to root
 COPY go.work go.work
+COPY go.work.sum go.work.sum 2>/dev/null || true
 
 # Copy pkg module
 COPY pkg/ ./pkg/
