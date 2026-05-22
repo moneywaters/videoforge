@@ -99,7 +99,7 @@ func NewNeonPoolWithConfig(config *NeonConfig) (*pgxpool.Pool, error) {
 
 	// Verify the connection works
 	if err := pool.Ping(context.Background()); err != nil {
-		pool.Dispose()
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
@@ -139,7 +139,7 @@ func CheckNeonHealth(ctx context.Context, pool *pgxpool.Pool) (*NeonHealthCheckR
 	// Get pool stats
 	stats := pool.Stat()
 	result.MaxConnections = stats.MaxConns()
-	result.AvailableConns = stats.AvailableConns()
+	result.AvailableConns = stats.AcquiredConns()
 
 	// Try to extract project/database info from config
 	if pool.Config() != nil {
@@ -237,7 +237,7 @@ func NewNeonPoolWrapper(connString string) (*NeonPoolWrapper, error) {
 // Close closes the underlying pool.
 func (n *NeonPoolWrapper) Close() {
 	if n.pool != nil {
-		n.pool.Dispose()
+		n.pool.Close()
 		n.pool = nil
 	}
 }

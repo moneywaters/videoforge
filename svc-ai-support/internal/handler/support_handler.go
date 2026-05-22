@@ -3,16 +3,17 @@ package handler
 import (
 	"context"
 	"crypto/rsa"
+	"encoding/json"
 	"errors"
 	"fmt"
 	"net/http"
 
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/google/uuid"
-	"svc-ai-support/internal/model"
-	"svc-ai-support/internal/service"
+	"github.com/videoforge/backend/svc-ai-support/internal/model"
+	"github.com/videoforge/backend/svc-ai-support/internal/service"
 
-	"github.com/videoforge/backend/pkg/errors"
+	apperrors "github.com/videoforge/backend/pkg/errors"
 	backendmiddleware "github.com/videoforge/backend/pkg/middleware"
 )
 
@@ -37,24 +38,24 @@ func (h *SupportHandler) Chat(w http.ResponseWriter, r *http.Request) {
 	// Get userID from context (set by auth middleware)
 	userID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
 	var req model.ChatRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errors.WriteError(r.Context(), w, errors.BadRequest("invalid request body"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("invalid request body"))
 		return
 	}
 
 	if req.Message == "" {
-		errors.WriteError(r.Context(), w, errors.BadRequest("message is required"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("message is required"))
 		return
 	}
 
 	response, err := h.service.Chat(r.Context(), userID, req)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -66,13 +67,13 @@ func (h *SupportHandler) ListConversations(w http.ResponseWriter, r *http.Reques
 	// Get userID from context
 	userID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
 	conversations, err := h.service.GetConversations(r.Context(), userID)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -88,20 +89,20 @@ func (h *SupportHandler) GetConversation(w http.ResponseWriter, r *http.Request)
 	// Get userID from context
 	userID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
 	// Extract conversation ID from path
 	conversationID, err := extractUUIDFromPath(r, "id")
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.BadRequest("invalid conversation ID"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("invalid conversation ID"))
 		return
 	}
 
 	conversation, err := h.service.GetConversation(r.Context(), userID, conversationID)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -113,14 +114,14 @@ func (h *SupportHandler) Escalate(w http.ResponseWriter, r *http.Request) {
 	// Get userID from context
 	userID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
 	// Extract conversation ID from path
 	conversationID, err := extractUUIDFromPath(r, "id")
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.BadRequest("invalid conversation ID"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("invalid conversation ID"))
 		return
 	}
 
@@ -131,7 +132,7 @@ func (h *SupportHandler) Escalate(w http.ResponseWriter, r *http.Request) {
 
 	escalation, err := h.service.Escalate(r.Context(), userID, conversationID, req.Reason)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -143,7 +144,7 @@ func (h *SupportHandler) ResolveEscalation(w http.ResponseWriter, r *http.Reques
 	// Get adminID from context (set by admin middleware)
 	adminID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
@@ -153,19 +154,19 @@ func (h *SupportHandler) ResolveEscalation(w http.ResponseWriter, r *http.Reques
 	// Extract escalation ID from path
 	escalationID, err := extractUUIDFromPath(r, "id")
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.BadRequest("invalid escalation ID"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("invalid escalation ID"))
 		return
 	}
 
 	var req model.ResolveEscalationRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		errors.WriteError(r.Context(), w, errors.BadRequest("invalid request body"))
+		apperrors.WriteError(r.Context(), w, apperrors.BadRequest("invalid request body"))
 		return
 	}
 
 	escalation, err := h.service.ResolveEscalation(r.Context(), adminID, escalationID, req.Notes)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -177,7 +178,7 @@ func (h *SupportHandler) ListEscalations(w http.ResponseWriter, r *http.Request)
 	// Get adminID from context
 	adminID, err := getUserID(r.Context())
 	if err != nil {
-		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
+		apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("unauthorized"))
 		return
 	}
 
@@ -192,7 +193,7 @@ func (h *SupportHandler) ListEscalations(w http.ResponseWriter, r *http.Request)
 
 	escalations, err := h.service.GetEscalations(r.Context(), adminID, statusPtr)
 	if err != nil {
-		errors.WriteError(r.Context(), w, err)
+		apperrors.WriteError(r.Context(), w, err)
 		return
 	}
 
@@ -268,19 +269,19 @@ func (m *AuthMiddleware) Authenticate(next http.Handler) http.Handler {
 		// Extract token from Authorization header
 		authHeader := r.Header.Get("Authorization")
 		if authHeader == "" {
-			errors.WriteError(r.Context(), w, errors.Unauthorized("missing authorization header"))
+			apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("missing authorization header"))
 			return
 		}
 
 		parts := splitAuthHeader(authHeader)
 		if len(parts) != 2 || parts[0] != "Bearer" {
-			errors.WriteError(r.Context(), w, errors.Unauthorized("invalid authorization header format"))
+			apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("invalid authorization header format"))
 			return
 		}
 
 		token := parts[1]
 		if token == "" {
-			errors.WriteError(r.Context(), w, errors.Unauthorized("empty token"))
+			apperrors.WriteError(r.Context(), w, apperrors.Unauthorized("empty token"))
 			return
 		}
 
@@ -361,7 +362,7 @@ func RequireAdmin(next http.Handler) http.Handler {
 		// Get role from context (set by auth middleware)
 		role, ok := r.Context().Value("role").(string)
 		if !ok || role != "admin" {
-			errors.WriteError(r.Context(), w, errors.Forbidden("admin access required"))
+			apperrors.WriteError(r.Context(), w, apperrors.Forbidden("admin access required"))
 			return
 		}
 		next.ServeHTTP(w, r)

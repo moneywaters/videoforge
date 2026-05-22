@@ -33,12 +33,13 @@ func (u *User) ToResponse() UserResponse {
 	if u.LastLoginAt != nil {
 		resp.LastLogin = u.LastLoginAt
 	}
+	// Don't copy LastLogin from source pointer - that's handled in if block
 	return resp
 }
 
 // UserResponse is the API response for a user
 type UserResponse struct {
-	ID        uuid.UUID  `json:"id"`
+	ID        string    `json:"id"`
 	Email     string    `json:"email"`
 	Name      string    `json:"name"`
 	Role      string    `json:"role"`
@@ -156,7 +157,7 @@ func (d *Dispute) ToResponse() DisputeResponse {
 		resp.Resolution = *d.Resolution
 	}
 	if d.ResolvedBy != nil {
-		resp.ResolvedBy = *d.ResolvedBy
+		resp.ResolvedBy = d.ResolvedBy.String()
 	}
 	if d.ResolvedAt != nil {
 		resp.ResolvedAt = *d.ResolvedAt
@@ -220,16 +221,16 @@ func (m *ModerationQueue) ToResponse() ModerationQueueResponse {
 	resp := ModerationQueueResponse{
 		ID:          m.ID.String(),
 		TargetType:  m.TargetType,
-		TargetID:   m.TargetID.String(),
-		FlagReason: m.FlagReason,
-		Status:    m.Status,
-		CreatedAt: m.CreatedAt,
+		TargetID:    m.TargetID.String(),
+		FlagReason:  m.FlagReason,
+		Status:      m.Status,
+		CreatedAt:   m.CreatedAt,
 	}
 	if m.ReviewedBy != nil {
-		resp.ReviewedBy = *m.ReviewedBy
+		resp.ReviewedBy = m.ReviewedBy.String()
 	}
 	if m.ReviewedAt != nil {
-		resp.ReviewedAt = *m.ReviewedAt
+		resp.ReviewedAt = m.ReviewedAt
 	}
 	if m.ActionTaken != nil {
 		resp.ActionTaken = *m.ActionTaken

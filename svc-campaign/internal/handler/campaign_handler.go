@@ -10,17 +10,17 @@ import (
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/middleware"
 
-	"svc-campaign/internal/model"
-	"svc-campaign/internal/service"
+	"github.com/videoforge/backend/svc-campaign/internal/model"
+	"github.com/videoforge/backend/svc-campaign/internal/service"
 )
 
 // CampaignHandler handles campaign HTTP requests
 type CampaignHandler struct {
-	service service.CampaignServiceInterface
+	service *service.CampaignService
 }
 
 // NewCampaignHandler creates a new CampaignHandler
-func NewCampaignHandler(svc service.CampaignServiceInterface) *CampaignHandler {
+func NewCampaignHandler(svc *service.CampaignService) *CampaignHandler {
 	return &CampaignHandler{service: svc}
 }
 
@@ -30,10 +30,6 @@ func (h *CampaignHandler) HandleCreateCampaign(w http.ResponseWriter, r *http.Re
 
 	// Get user ID from context (use shared middleware function)
 	userIDStr := middleware.GetUserID(ctx)
-	if userIDStr == "" {
-		// Try local fallback
-		userIDStr = GetUserID(ctx)
-	}
 	if userIDStr == "" {
 		errors.WriteError(ctx, w, errors.Unauthorized("user not authenticated"))
 		return
@@ -120,7 +116,7 @@ func (h *CampaignHandler) HandleUpdateCampaign(w http.ResponseWriter, r *http.Re
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	// Extract campaign ID from path
 	campaignID := extractPathVar(r, "id")
@@ -164,7 +160,7 @@ func (h *CampaignHandler) HandleListCampaigns(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	// Get query parameters
 	status := r.URL.Query().Get("status")
@@ -234,7 +230,7 @@ func (h *CampaignHandler) HandleStartCampaign(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -268,7 +264,7 @@ func (h *CampaignHandler) HandlePauseCampaign(w http.ResponseWriter, r *http.Req
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -302,7 +298,7 @@ func (h *CampaignHandler) HandleEndCampaign(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -336,7 +332,7 @@ func (h *CampaignHandler) HandleAddVideo(w http.ResponseWriter, r *http.Request)
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -377,7 +373,7 @@ func (h *CampaignHandler) HandleRemoveVideo(w http.ResponseWriter, r *http.Reque
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -415,7 +411,7 @@ func (h *CampaignHandler) HandleGetBudget(w http.ResponseWriter, r *http.Request
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -449,7 +445,7 @@ func (h *CampaignHandler) HandleUpdateBudget(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	campaignID := extractPathVar(r, "id")
 	if campaignID == "" {
@@ -489,7 +485,7 @@ func (h *CampaignHandler) HandleCreateAdAccount(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	role := GetUserRole(ctx)
+	role := middleware.GetUserRole(ctx)
 
 	var req model.AdAccountRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

@@ -9,8 +9,8 @@ import (
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"svc-ai-support/internal/model"
-	"svc-ai-support/internal/repository"
+	"github.com/videoforge/backend/svc-ai-support/internal/model"
+	"github.com/videoforge/backend/svc-ai-support/internal/repository"
 
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/natsclient"
@@ -215,7 +215,7 @@ func (s *SupportService) GetEscalations(ctx context.Context, adminID uuid.UUID, 
 
 	responses := make([]model.EscalationResponse, len(escalations))
 	for i, esc := range escalations {
-		responses[i] = esc.ToResponse()
+		responses[i] = *esc.ToResponse()
 	}
 
 	return responses, nil

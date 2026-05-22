@@ -2,17 +2,6 @@ package model
 
 import "time"
 
-// User represents an admin user view
-type User struct {
-	ID        string    `json:"id"`
-	Email     string    `json:"email"`
-	Name      string    `json:"name"`
-	Role      string    `json:"role"` // admin, super_admin
-	Status    string    `json:"status"` // active, suspended
-	LastLogin *time.Time `json:"last_login,omitempty"`
-	CreatedAt time.Time `json:"created_at"`
-}
-
 // AuditLog represents an audit log entry
 type AuditLog struct {
 	ID        string    `json:"id"`

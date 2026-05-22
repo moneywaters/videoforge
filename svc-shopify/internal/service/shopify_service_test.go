@@ -8,8 +8,8 @@ import (
 
 	"github.com/google/uuid"
 
-	"svc-shopify/internal/model"
-	"svc-shopify/internal/repository"
+	"github.com/videoforge/backend/svc-shopify/internal/model"
+	"github.com/videoforge/backend/svc-shopify/internal/repository"
 )
 
 // =============================================================================

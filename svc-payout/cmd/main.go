@@ -10,9 +10,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/gorilla/mux"
-
-	"github.com/videoforge/backend/pkg/config"
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/natsclient"

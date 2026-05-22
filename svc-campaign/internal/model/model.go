@@ -1,22 +1,5 @@
 package model
 
-import "time"
-
-// Campaign represents an advertising campaign
-type Campaign struct {
-	ID          string    `json:"id"`
-	UserID     string    `json:"user_id"`
-	Name       string    `json:"name"`
-	Status     string    `json:"status"` // draft, active, paused, completed
-	Budget     float64   `json:"budget"`
-	StartDate  time.Time `json:"start_date"`
-	EndDate    *time.Time `json:"end_date,omitempty"`
-	Platforms []string  `json:"platforms"` // youtube, tiktok, instagram
-	Targeting  Targeting `json:"targeting"`
-	CreatedAt time.Time `json:"created_at"`
-	UpdatedAt time.Time `json:"updated_at"`
-}
-
 // Targeting defines campaign targeting options
 type Targeting struct {
 	AgeMin      int      `json:"age_min"`

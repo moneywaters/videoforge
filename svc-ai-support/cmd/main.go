@@ -3,32 +3,20 @@ package main
 import (
 	"context"
 	"fmt"
+	"log/slog"
 	"net/http"
 	"os"
 	"os/signal"
 	"syscall"
 	"time"
 
-	"svc-ai-support/internal/config"
-	"svc-ai-support/internal/handler"
-	"svc-ai-support/internal/service"
+	"github.com/videoforge/backend/svc-ai-support/internal/config"
+	"github.com/videoforge/backend/svc-ai-support/internal/handler"
+	"github.com/videoforge/backend/svc-ai-support/internal/service"
 
-	"github.com/videoforge/backend/pkg/logger"
-	backendmiddleware "github.com/videoforge/backend/pkg/middleware"
+	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/natsclient"
 )
-
-// @title VideoForge AI Support Service API
-// @version 1.0
-// @description AI-powered conversational support service for VideoForge
-// @termsOfService https://videoforge.io/terms
-
-// @contact.name VideoForge Support
-// @contact.url https://videoforge.io/support
-// @contact.email support@videoforge.io
-
-// @license.name MIT
-// @license.url https://opensource.org/licenses/MIT
 
 func main() {
 	// Load configuration
@@ -39,24 +27,20 @@ func main() {
 	}
 	defer cfg.Close()
 
-	logger.Info("starting AI support service",
-		"port", cfg.Server.Port,
-	)
+	slog.Info("starting AI support service", "port", cfg.Server.Port)
 
 	// Initialize NATS client (optional - service can run without it)
 	var natsClient natsclient.NATSClient
 	natsCfg := natsclient.DefaultConfig()
 	natsCfg.URL = cfg.NATS.URL
-	natsClient = natsclient.New(natsCfg, logger.Default("development"))
+	natsClient = natsclient.New(natsCfg, nil)
 
 	// Try to connect to NATS
 	if err := natsClient.Connect(); err != nil {
-		logger.Warn("NATS not available, running without event publishing",
-			"error", err,
-		)
+		slog.Warn("NATS not available, running without event publishing", "error", err)
 		natsClient = nil
 	} else {
-		logger.Info("NATS connected")
+		slog.Info("NATS connected")
 		defer natsClient.Close()
 	}
 
@@ -64,15 +48,13 @@ func main() {
 	supportService := service.NewSupportService(cfg.Database.Pool, natsClient)
 
 	// Initialize middleware
-	recoverMw := backendmiddleware.Recover()
-	loggerMw := backendmiddleware.Logger()
 	authMiddleware := handler.NewAuthMiddleware(cfg.JWT.PublicKey)
 
 	// Setup router
 	mux := http.NewServeMux()
 
 	// Health check
-	mux.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+	mux.HandleFunc("GET /health", func(w http.ResponseWriter, r *http.Request) {
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusOK)
 		w.Write([]byte(`{"status":"ok"}`))
@@ -83,30 +65,34 @@ func main() {
 
 	// Support handlers
 	supportH := handler.NewSupportHandler(supportService)
-	api.HandleFunc("/api/v1/support/chat", supportH.Chat)
+	api.HandleFunc("POST /api/v1/support/chat", supportH.Chat)
 
 	// Protected routes
 	protected := http.NewServeMux()
-	protected.HandleFunc("/api/v1/support/conversations", supportH.ListConversations)
-	protected.HandleFunc("/api/v1/support/conversations/", supportH.GetConversation)
+	protected.HandleFunc("GET /api/v1/support/conversations", supportH.ListConversations)
+	protected.HandleFunc("GET /api/v1/support/conversations/", supportH.GetConversation)
 
 	// Escalation endpoints
 	escalateHandler := http.NewServeMux()
-	escalateHandler.HandleFunc("/api/v1/support/conversations/", supportH.Escalate)
-	escalateHandler.HandleFunc("/api/v1/support/escalations", supportH.ListEscalations)
-	escalateHandler.HandleFunc("/api/v1/support/escalations/", supportH.ResolveEscalation)
+	escalateHandler.HandleFunc("POST /api/v1/support/conversations/", supportH.Escalate)
+	escalateHandler.HandleFunc("GET /api/v1/support/escalations", supportH.ListEscalations)
+	escalateHandler.HandleFunc("POST /api/v1/support/escalations/", supportH.ResolveEscalation)
 
-	// Wrap with auth middleware
-	protected = authMiddleware.Authenticate(protected)
-	escalateHandler = authMiddleware.Authenticate(escalateHandler)
+	// Wrap with auth middleware - use http.Handler directly
+	protected = wrapHandler(authMiddleware.Authenticate(protected))
+	escalateHandler = wrapHandler(authMiddleware.Authenticate(escalateHandler))
 
 	api.Handle("/api/v1/support/conversations", protected)
 	api.Handle("/api/v1/support/conversations/", escalateHandler)
 	api.Handle("/api/v1/support/escalations", escalateHandler)
 	api.Handle("/api/v1/support/escalations/", escalateHandler)
 
-	// Apply global middleware
-	handler := loggerMw(recoverMw(api))
+	// Apply global middleware using Chain
+	handler := middleware.Chain(api,
+		middleware.RequestID,
+		middleware.Recover,
+		middleware.Logger,
+	)
 
 	// Create server
 	server := &http.Server{
@@ -119,9 +105,9 @@ func main() {
 
 	// Start server
 	go func() {
-		logger.Info("server starting", "addr", server.Addr)
+		slog.Info("server starting", "addr", server.Addr)
 		if err := server.ListenAndServe(); err != nil && err != http.ErrServerClosed {
-			logger.Error("server failed", "error", err)
+			slog.Error("server failed", "error", err)
 			os.Exit(1)
 		}
 	}()
@@ -131,16 +117,23 @@ func main() {
 	signal.Notify(quit, syscall.SIGINT, syscall.SIGTERM)
 	<-quit
 
-	logger.Info("shutting down server")
+	slog.Info("shutting down server")
 
 	// Graceful shutdown
 	ctx, cancel := context.WithTimeout(context.Background(), 30*time.Second)
 	defer cancel()
 
 	if err := server.Shutdown(ctx); err != nil {
-		logger.Error("server shutdown failed", "error", err)
+		slog.Error("server shutdown failed", "error", err)
 		os.Exit(1)
 	}
 
-	logger.Info("server stopped")
+	slog.Info("server stopped")
+}
+
+// wrapHandler wraps an http.Handler to return *http.ServeMux
+func wrapHandler(h http.Handler) *http.ServeMux {
+	m := http.NewServeMux()
+	m.Handle("/", h)
+	return m
 }

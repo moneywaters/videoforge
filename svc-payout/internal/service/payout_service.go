@@ -9,6 +9,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/nats-io/nats.go"
 
+	"github.com/videoforge/backend/pkg/natsclient"
 	"github.com/videoforge/backend/svc-payout/internal/model"
 	"github.com/videoforge/backend/svc-payout/internal/repository"
 )
@@ -16,12 +17,12 @@ import (
 // PayoutService handles payout business logic
 type PayoutService struct {
 	repo     *repository.PayoutRepository
-	nc       *nats.Conn
-holdDays int
+	nc       *natsclient.Client
+	holdDays int
 }
 
 // NewPayoutService creates a new payout service
-func NewPayoutService(repo *repository.PayoutRepository, nc *nats.Conn, holdDays int) *PayoutService {
+func NewPayoutService(repo *repository.PayoutRepository, nc *natsclient.Client, holdDays int) *PayoutService {
 	return &PayoutService{
 		repo:     repo,
 		nc:       nc,
@@ -390,7 +391,7 @@ func (s *PayoutService) SubscribeToEvents(ctx context.Context) error {
 	}
 
 	// Subscribe to sale.attributed events
-	_, err := s.nc.Subscribe("sale.attributed", func(msg *nats.Msg) {
+	err := s.nc.Subscribe("sale.attributed", func(msg *nats.Msg) {
 		var event model.SaleAttributedEvent
 		if err := json.Unmarshal(msg.Data, &event); err != nil {
 			return

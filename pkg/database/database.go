@@ -6,6 +6,7 @@ import (
 	"sync"
 	"time"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 	"github.com/videoforge/backend/pkg/logger"
 )
@@ -42,11 +43,11 @@ type PoolConfig struct {
 // DefaultPoolConfig returns default configuration for the database pool.
 func DefaultPoolConfig(connString string) *PoolConfig {
 	return &PoolConfig{
-		ConnString:       connString,
-		MaxConns:         20,
-		MinConns:         5,
-		MaxConnLifetime:  time.Hour,
-		MaxConnIdleTime:  30 * time.Minute,
+		ConnString:        connString,
+		MaxConns:          20,
+		MinConns:          5,
+		MaxConnLifetime:   time.Hour,
+		MaxConnIdleTime:   30 * time.Minute,
 		HealthCheckPeriod: 5 * time.Minute,
 	}
 }
@@ -83,14 +84,11 @@ func NewPoolWithConfig(config *PoolConfig, log *logger.Logger) (*Pool, error) {
 
 	// Test connection
 	if err := pool.Ping(context.Background()); err != nil {
-		pool.Dispose()
+		pool.Close()
 		return nil, fmt.Errorf("failed to ping database: %w", err)
 	}
 
-	log.Info("Database pool created",
-		logger.Info("max_conns", config.MaxConns),
-		logger.Info("min_conns", config.MinConns),
-	)
+	log.Info("Database pool created")
 
 	return &Pool{
 		pool: pool,
@@ -104,7 +102,7 @@ func (p *Pool) Close() error {
 	defer p.mutex.Unlock()
 
 	if p.pool != nil {
-		p.pool.Dispose()
+		p.pool.Close()
 		p.pool = nil
 		p.log.Info("Database pool closed")
 	}
@@ -125,8 +123,8 @@ func (p *Pool) Exec(ctx context.Context, query string, args ...interface{}) erro
 	return err
 }
 
-// Query executes a query that returns rows.
-func (p *Pool) Query(ctx context.Context, query string, args ...interface{}) (pgxpool.Rows, error) {
+// Query executes a query that returns Rows
+func (p *Pool) Query(ctx context.Context, query string, args ...interface{}) (pgx.Rows, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -137,13 +135,13 @@ func (p *Pool) Query(ctx context.Context, query string, args ...interface{}) (pg
 	return p.pool.Query(ctx, query, args...)
 }
 
-// QueryRow executes a query that returns a single row.
-func (p *Pool) QueryRow(ctx context.Context, query string, args ...interface{}) pgxpool.Row {
+// QueryRow executes a query that returns a single Row
+func (p *Pool) QueryRow(ctx context.Context, query string, args ...interface{}) pgx.Row {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
 	if p.pool == nil {
-		return pgxpool.Row{}
+		return nil
 	}
 
 	return p.pool.QueryRow(ctx, query, args...)
@@ -162,7 +160,7 @@ func (p *Pool) Acquire(ctx context.Context) (*pgxpool.Conn, error) {
 }
 
 // Begin starts a transaction.
-func (p *Pool) Begin(ctx context.Context) (pgxpool.Tx, error) {
+func (p *Pool) Begin(ctx context.Context) (pgx.Tx, error) {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -174,7 +172,7 @@ func (p *Pool) Begin(ctx context.Context) (pgxpool.Tx, error) {
 }
 
 // BeginFunc starts a transaction and executes the given function.
-func (p *Pool) BeginFunc(ctx context.Context, f func(pgxpool.Tx) error) error {
+func (p *Pool) BeginFunc(ctx context.Context, f func(pgx.Tx) error) error {
 	p.mutex.RLock()
 	defer p.mutex.RUnlock()
 
@@ -182,7 +180,15 @@ func (p *Pool) BeginFunc(ctx context.Context, f func(pgxpool.Tx) error) error {
 		return fmt.Errorf("pool is closed")
 	}
 
-	return p.pool.BeginFunc(ctx, f)
+	tx, err := p.pool.Begin(ctx)
+	if err != nil {
+		return err
+	}
+	if err := f(tx); err != nil {
+		_ = tx.Rollback(ctx)
+		return err
+	}
+	return tx.Commit(ctx)
 }
 
 // Ping checks the database connection.

@@ -9,19 +9,16 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/pgtype"
-	"svc-admin/internal/model"
-
-	"github.com/videoforge/backend/pkg/errors"
+	"github.com/videoforge/backend/svc-admin/internal/model"
 )
 
 var (
 	// ErrUserNotFound is returned when a user is not found
-	ErrUserNotFound = errors.New("user not found", 404)
+	ErrUserNotFound = errors.New("user not found")
 	// ErrDisputeNotFound is returned when a dispute is not found
-	ErrDisputeNotFound = errors.New("dispute not found", 404)
+	ErrDisputeNotFound = errors.New("dispute not found")
 	// ErrModerationNotFound is returned when a moderation item is not found
-	ErrModerationNotFound = errors.New("moderation item not found", 404)
+	ErrModerationNotFound = errors.New("moderation item not found")
 )
 
 // AdminRepository handles database operations for admin
@@ -116,7 +113,7 @@ func (r *AdminRepository) SearchUsers(ctx context.Context, req model.UserListReq
 	var users []model.User
 	for rows.Next() {
 		var user model.User
-		var lastLoginAt pgtype.NullTime
+		var lastLoginAt *time.Time
 		if err := rows.Scan(
 			&user.ID,
 			&user.Email,
@@ -130,9 +127,7 @@ func (r *AdminRepository) SearchUsers(ctx context.Context, req model.UserListReq
 		); err != nil {
 			return nil, 0, err
 		}
-		if lastLoginAt.Valid {
-			user.LastLoginAt = &lastLoginAt.Time
-		}
+		user.LastLoginAt = lastLoginAt
 		users = append(users, user)
 	}
 
@@ -147,7 +142,7 @@ func (r *AdminRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*model
 		WHERE id = $1
 	`
 	var user model.User
-	var lastLoginAt pgtype.NullTime
+	var lastLoginAt *time.Time
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&user.ID,
 		&user.Email,
@@ -165,9 +160,7 @@ func (r *AdminRepository) GetUserByID(ctx context.Context, id uuid.UUID) (*model
 		}
 		return nil, fmt.Errorf("failed to get user: %w", err)
 	}
-	if lastLoginAt.Valid {
-		user.LastLoginAt = &lastLoginAt.Time
-	}
+	user.LastLoginAt = lastLoginAt
 	return &user, nil
 }
 
@@ -289,7 +282,7 @@ func (r *AdminRepository) ListAdminActions(ctx context.Context, req model.Action
 	var actions []model.AdminAction
 	for rows.Next() {
 		var action model.AdminAction
-		var targetUserID, targetID pgtype.UUID
+		var targetUserID, targetID *uuid.UUID
 		if err := rows.Scan(
 			&action.ID,
 			&action.AdminID,
@@ -303,12 +296,8 @@ func (r *AdminRepository) ListAdminActions(ctx context.Context, req model.Action
 		); err != nil {
 			return nil, 0, err
 		}
-		if targetUserID.Valid {
-			action.TargetUserID = &targetUserID.UUID
-		}
-		if targetID.Valid {
-			action.TargetID = &targetID.UUID
-		}
+		action.TargetUserID = targetUserID
+		action.TargetID = targetID
 		actions = append(actions, action)
 	}
 
@@ -361,8 +350,9 @@ func (r *AdminRepository) ListDisputes(ctx context.Context, req model.DisputesLi
 	var disputes []model.Dispute
 	for rows.Next() {
 		var dispute model.Dispute
-		var resolution, resolvedBy pgtype.UUID
-		var resolvedAt pgtype.NullTime
+		var resolution *string
+		var resolvedBy *uuid.UUID
+		var resolvedAt *time.Time
 		if err := rows.Scan(
 			&dispute.ID,
 			&dispute.ReporterID,
@@ -380,16 +370,9 @@ func (r *AdminRepository) ListDisputes(ctx context.Context, req model.DisputesLi
 		); err != nil {
 			return nil, 0, err
 		}
-		if resolution.Valid {
-			res := resolution.UUID.String()
-			dispute.Resolution = &res
-		}
-		if resolvedBy.Valid {
-			dispute.ResolvedBy = &resolvedBy.UUID
-		}
-		if resolvedAt.Valid {
-			dispute.ResolvedAt = &resolvedAt.Time
-		}
+		dispute.Resolution = resolution
+		dispute.ResolvedBy = resolvedBy
+		dispute.ResolvedAt = resolvedAt
 		disputes = append(disputes, dispute)
 	}
 
@@ -404,8 +387,9 @@ func (r *AdminRepository) GetDisputeByID(ctx context.Context, id uuid.UUID) (*mo
 		WHERE id = $1
 	`
 	var dispute model.Dispute
-	var resolution, resolvedBy pgtype.UUID
-	var resolvedAt pgtype.NullTime
+	var resolution *string
+	var resolvedBy *uuid.UUID
+	var resolvedAt *time.Time
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&dispute.ID,
 		&dispute.ReporterID,
@@ -427,16 +411,9 @@ func (r *AdminRepository) GetDisputeByID(ctx context.Context, id uuid.UUID) (*mo
 		}
 		return nil, fmt.Errorf("failed to get dispute: %w", err)
 	}
-	if resolution.Valid {
-		res := resolution.UUID.String()
-		dispute.Resolution = &res
-	}
-	if resolvedBy.Valid {
-		dispute.ResolvedBy = &resolvedBy.UUID
-	}
-	if resolvedAt.Valid {
-		dispute.ResolvedAt = &resolvedAt.Time
-	}
+	dispute.Resolution = resolution
+	dispute.ResolvedBy = resolvedBy
+	dispute.ResolvedAt = resolvedAt
 	return &dispute, nil
 }
 
@@ -503,9 +480,9 @@ func (r *AdminRepository) ListModerationQueue(ctx context.Context, req model.Mod
 	var items []model.ModerationQueue
 	for rows.Next() {
 		var item model.ModerationQueue
-		var reviewedBy pgtype.UUID
-		var reviewedAt pgtype.NullTime
-		var actionTaken pgtype.Text
+		var reviewedBy *uuid.UUID
+		var reviewedAt *time.Time
+		var actionTaken *string
 		if err := rows.Scan(
 			&item.ID,
 			&item.TargetType,
@@ -519,15 +496,9 @@ func (r *AdminRepository) ListModerationQueue(ctx context.Context, req model.Mod
 		); err != nil {
 			return nil, 0, err
 		}
-		if reviewedBy.Valid {
-			item.ReviewedBy = &reviewedBy.UUID
-		}
-		if reviewedAt.Valid {
-			item.ReviewedAt = &reviewedAt.Time
-		}
-		if actionTaken.Valid {
-			item.ActionTaken = &actionTaken.String
-		}
+		item.ReviewedBy = reviewedBy
+		item.ReviewedAt = reviewedAt
+		item.ActionTaken = actionTaken
 		items = append(items, item)
 	}
 
@@ -542,9 +513,9 @@ func (r *AdminRepository) GetModerationQueueByID(ctx context.Context, id uuid.UU
 		WHERE id = $1
 	`
 	var item model.ModerationQueue
-	var reviewedBy pgtype.UUID
-	var reviewedAt pgtype.NullTime
-	var actionTaken pgtype.Text
+	var reviewedBy *uuid.UUID
+	var reviewedAt *time.Time
+	var actionTaken *string
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&item.ID,
 		&item.TargetType,
@@ -562,15 +533,9 @@ func (r *AdminRepository) GetModerationQueueByID(ctx context.Context, id uuid.UU
 		}
 		return nil, fmt.Errorf("failed to get moderation queue item: %w", err)
 	}
-	if reviewedBy.Valid {
-		item.ReviewedBy = &reviewedBy.UUID
-	}
-	if reviewedAt.Valid {
-		item.ReviewedAt = &reviewedAt.Time
-	}
-	if actionTaken.Valid {
-		item.ActionTaken = &actionTaken.String
-	}
+	item.ReviewedBy = reviewedBy
+	item.ReviewedAt = reviewedAt
+	item.ActionTaken = actionTaken
 	return &item, nil
 }
 

@@ -7,8 +7,8 @@ import (
 
 	"github.com/go-chi/chi/v5"
 	"github.com/videoforge/backend/pkg/errors"
-	"svc-performance/internal/model"
-	"svc-performance/internal/service"
+	"github.com/videoforge/backend/svc-performance/internal/model"
+	"github.com/videoforge/backend/svc-performance/internal/service"
 )
 
 type PerformanceHandler struct {
@@ -23,7 +23,7 @@ func NewPerformanceHandler(svc *service.PerformanceService) *PerformanceHandler 
 func (h *PerformanceHandler) GetVideoSales(w http.ResponseWriter, r *http.Request) {
 	videoID := chi.URLParam(r, "id")
 	if videoID == "" {
-		errors.BadRequest("video id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("video id is required"))
 		return
 	}
 
@@ -33,7 +33,7 @@ func (h *PerformanceHandler) GetVideoSales(w http.ResponseWriter, r *http.Reques
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get video sales").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get video sales"))
 		return
 	}
 
@@ -46,7 +46,7 @@ func (h *PerformanceHandler) GetVideoSales(w http.ResponseWriter, r *http.Reques
 func (h *PerformanceHandler) GetEditorSales(w http.ResponseWriter, r *http.Request) {
 	editorID := chi.URLParam(r, "id")
 	if editorID == "" {
-		errors.BadRequest("editor id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("editor id is required"))
 		return
 	}
 
@@ -56,7 +56,7 @@ func (h *PerformanceHandler) GetEditorSales(w http.ResponseWriter, r *http.Reque
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get editor sales").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get editor sales"))
 		return
 	}
 
@@ -69,7 +69,7 @@ func (h *PerformanceHandler) GetEditorSales(w http.ResponseWriter, r *http.Reque
 func (h *PerformanceHandler) GetSpecialistSales(w http.ResponseWriter, r *http.Request) {
 	specialistID := chi.URLParam(r, "id")
 	if specialistID == "" {
-		errors.BadRequest("specialist id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("specialist id is required"))
 		return
 	}
 
@@ -79,7 +79,7 @@ func (h *PerformanceHandler) GetSpecialistSales(w http.ResponseWriter, r *http.R
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get specialist sales").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get specialist sales"))
 		return
 	}
 
@@ -92,7 +92,7 @@ func (h *PerformanceHandler) GetSpecialistSales(w http.ResponseWriter, r *http.R
 func (h *PerformanceHandler) GetCampaignSales(w http.ResponseWriter, r *http.Request) {
 	campaignID := chi.URLParam(r, "id")
 	if campaignID == "" {
-		errors.BadRequest("campaign id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("campaign id is required"))
 		return
 	}
 
@@ -102,7 +102,7 @@ func (h *PerformanceHandler) GetCampaignSales(w http.ResponseWriter, r *http.Req
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get campaign sales").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get campaign sales"))
 		return
 	}
 
@@ -115,18 +115,18 @@ func (h *PerformanceHandler) GetCampaignSales(w http.ResponseWriter, r *http.Req
 func (h *PerformanceHandler) GetLeaderboard(w http.ResponseWriter, r *http.Request) {
 	briefID := chi.URLParam(r, "id")
 	if briefID == "" {
-		errors.BadRequest("brief id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("brief id is required"))
 		return
 	}
 
 	entityType := r.URL.Query().Get("entity_type")
 	if entityType == "" {
-		errors.BadRequest("entity_type query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type query parameter is required"))
 		return
 	}
 
 	if entityType != "editor" && entityType != "video" {
-		errors.BadRequest("entity_type must be 'editor' or 'video'").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type must be 'editor' or 'video'"))
 		return
 	}
 
@@ -136,7 +136,7 @@ func (h *PerformanceHandler) GetLeaderboard(w http.ResponseWriter, r *http.Reque
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get leaderboard").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get leaderboard"))
 		return
 	}
 
@@ -149,18 +149,18 @@ func (h *PerformanceHandler) GetLeaderboard(w http.ResponseWriter, r *http.Reque
 func (h *PerformanceHandler) GetRankings(w http.ResponseWriter, r *http.Request) {
 	briefID := chi.URLParam(r, "id")
 	if briefID == "" {
-		errors.BadRequest("brief id is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("brief id is required"))
 		return
 	}
 
 	entityType := r.URL.Query().Get("entity_type")
 	if entityType == "" {
-		errors.BadRequest("entity_type query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type query parameter is required"))
 		return
 	}
 
 	if entityType != "editor" && entityType != "video" {
-		errors.BadRequest("entity_type must be 'editor' or 'video'").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type must be 'editor' or 'video'"))
 		return
 	}
 
@@ -174,7 +174,7 @@ func (h *PerformanceHandler) GetRankings(w http.ResponseWriter, r *http.Request)
 	if limitStr != "" {
 		l, err := strconv.Atoi(limitStr)
 		if err != nil || l <= 0 || l > 100 {
-			errors.BadRequest("limit must be between 1 and 100").Write(r.Context(), w)
+			errors.Write(r.Context(), w, errors.BadRequest("limit must be between 1 and 100"))
 			return
 		}
 		limit = l
@@ -183,7 +183,7 @@ func (h *PerformanceHandler) GetRankings(w http.ResponseWriter, r *http.Request)
 	if offsetStr != "" {
 		o, err := strconv.Atoi(offsetStr)
 		if err != nil || o < 0 {
-			errors.BadRequest("offset must be non-negative").Write(r.Context(), w)
+			errors.Write(r.Context(), w, errors.BadRequest("offset must be non-negative"))
 			return
 		}
 		offset = o
@@ -195,7 +195,7 @@ func (h *PerformanceHandler) GetRankings(w http.ResponseWriter, r *http.Request)
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get rankings").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get rankings"))
 		return
 	}
 
@@ -216,25 +216,25 @@ func (h *PerformanceHandler) GetAnalytics(w http.ResponseWriter, r *http.Request
 
 	// Validate required params
 	if query.EntityType == "" {
-		errors.BadRequest("entity_type query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type query parameter is required"))
 		return
 	}
 	if query.EntityID == "" {
-		errors.BadRequest("entity_id query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_id query parameter is required"))
 		return
 	}
 	if query.StartDate == "" {
-		errors.BadRequest("start_date query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("start_date query parameter is required"))
 		return
 	}
 	if query.EndDate == "" {
-		errors.BadRequest("end_date query parameter is required").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("end_date query parameter is required"))
 		return
 	}
 
 	// Validate entity_type
 	if query.EntityType != "video" && query.EntityType != "campaign" {
-		errors.BadRequest("entity_type must be 'video' or 'campaign'").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.BadRequest("entity_type must be 'video' or 'campaign'"))
 		return
 	}
 
@@ -249,7 +249,7 @@ func (h *PerformanceHandler) GetAnalytics(w http.ResponseWriter, r *http.Request
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get analytics").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get analytics"))
 		return
 	}
 
@@ -266,7 +266,7 @@ func (h *PerformanceHandler) GetAnomalies(w http.ResponseWriter, r *http.Request
 			errors.Write(r.Context(), w, prob)
 			return
 		}
-		errors.Internal("failed to get anomalies").Write(r.Context(), w)
+		errors.Write(r.Context(), w, errors.Internal("failed to get anomalies"))
 		return
 	}
 

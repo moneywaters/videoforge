@@ -85,8 +85,8 @@ type EscalationResponse struct {
 }
 
 // ToResponse converts Escalation to EscalationResponse
-func (e *Escalation) ToResponse() EscalationResponse {
-	return EscalationResponse{
+func (e *Escalation) ToResponse() *EscalationResponse {
+	return &EscalationResponse{
 		ID:             e.ID,
 		ConversationID: e.ConversationID,
 		EscalatedBy:    e.EscalatedBy,

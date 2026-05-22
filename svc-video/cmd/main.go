@@ -15,7 +15,6 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/natsclient"
@@ -35,7 +34,7 @@ func main() {
 	}
 
 	log := logger.Default(configuration.Server.Environment)
-	ctx := logger.FromContext(context.Background()).Context(context.Background())
+	_ = logger.FromContext(context.Background()).Context(context.Background())
 
 	// Connect to NATS
 	nc := natsclient.New(nil, log)

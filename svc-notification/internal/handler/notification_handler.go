@@ -28,7 +28,7 @@ func NewNotificationHandler(svc *service.NotificationService) *NotificationHandl
 func (h *NotificationHandler) ListNotifications(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)
@@ -84,7 +84,7 @@ func (h *NotificationHandler) ListNotifications(w http.ResponseWriter, r *http.R
 func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)
@@ -110,7 +110,7 @@ func (h *NotificationHandler) MarkAsRead(w http.ResponseWriter, r *http.Request)
 func (h *NotificationHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)
@@ -130,7 +130,7 @@ func (h *NotificationHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Reque
 func (h *NotificationHandler) GetPreferences(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)
@@ -150,7 +150,7 @@ func (h *NotificationHandler) GetPreferences(w http.ResponseWriter, r *http.Requ
 func (h *NotificationHandler) UpdatePreferences(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)
@@ -185,7 +185,7 @@ func (h *NotificationHandler) UpdatePreferences(w http.ResponseWriter, r *http.R
 func (h *NotificationHandler) DeleteNotification(w http.ResponseWriter, r *http.Request) {
 	userID := r.Context().Value("user_id")
 	if userID == nil {
-		errors.WriteError(r.Context(), w, errors.New(http.StatusUnauthorized, "unauthorized"))
+		errors.WriteError(r.Context(), w, errors.Unauthorized("unauthorized"))
 		return
 	}
 	userIDStr := userID.(string)

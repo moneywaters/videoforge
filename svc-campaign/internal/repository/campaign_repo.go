@@ -9,7 +9,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
 
-	"svc-campaign/internal/model"
+	"github.com/videoforge/backend/svc-campaign/internal/model"
 )
 
 // CampaignRepo defines the interface for campaign data access

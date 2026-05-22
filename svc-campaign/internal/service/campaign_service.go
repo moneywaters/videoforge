@@ -10,8 +10,8 @@ import (
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/natsclient"
 
-	"svc-campaign/internal/model"
-	"svc-campaign/internal/repository"
+	"github.com/videoforge/backend/svc-campaign/internal/model"
+	"github.com/videoforge/backend/svc-campaign/internal/repository"
 )
 
 var (

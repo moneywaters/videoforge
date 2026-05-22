@@ -6,9 +6,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/videoforge/backend/pkg/logger"
-	"svc-performance/internal/model"
-	"svc-performance/internal/repository"
+	"github.com/videoforge/backend/svc-performance/internal/model"
+	"github.com/videoforge/backend/svc-performance/internal/repository"
 )
 
 type PerformanceService struct {
@@ -47,18 +46,13 @@ func (s *PerformanceService) GetCampaignSales(ctx context.Context, campaignID st
 
 func (s *PerformanceService) GetLeaderboard(ctx context.Context, briefID string, entityType string) ([]model.LeaderboardEntry, error) {
 	// Optionally recalculate leaderboard before returning
-	if err := s.repo.CalculateAndStoreLeaderboard(ctx, briefID, entityType); err != nil {
-		logger.Warn("Failed to recalculate leaderboard", "error", err, "brief_id", briefID)
-		// Continue with existing data
-	}
+	_ = s.repo.CalculateAndStoreLeaderboard(ctx, briefID, entityType)
 	return s.repo.GetLeaderboard(ctx, briefID, entityType)
 }
 
 func (s *PerformanceService) GetRankings(ctx context.Context, briefID string, entityType string, limit, offset int) ([]model.LeaderboardEntry, error) {
 	// Optionally recalculate leaderboard before returning
-	if err := s.repo.CalculateAndStoreLeaderboard(ctx, briefID, entityType); err != nil {
-		logger.Warn("Failed to recalculate leaderboard", "error", err, "brief_id", briefID)
-	}
+	_ = s.repo.CalculateAndStoreLeaderboard(ctx, briefID, entityType)
 	return s.repo.GetLeaderboardRankings(ctx, briefID, entityType, limit, offset)
 }
 
@@ -87,22 +81,17 @@ func (s *PerformanceService) GetAnomalies(ctx context.Context) ([]model.Anomaly,
 func (s *PerformanceService) ProcessSaleAttributedEvent(ctx context.Context, data []byte) error {
 	var event model.SaleAttributedEvent
 	if err := json.Unmarshal(data, &event); err != nil {
-		logger.Error("Failed to unmarshal sale event", "error", err)
 		return err
 	}
 
-	logger.Info("Processing sale attributed event", "sale_id", event.SaleID, "video_id", event.VideoID, "amount", event.Amount)
-
 	// Update video_sales
 	if err := s.repo.UpsertVideoSales(ctx, event.VideoID, event.CampaignID, event.Amount, event.Currency); err != nil {
-		logger.Error("Failed to update video sales", "error", err)
 		return err
 	}
 
 	// Update editor_sales
 	if event.EditorID != "" {
 		if err := s.repo.UpsertEditorSales(ctx, event.EditorID, event.Amount, event.Currency); err != nil {
-			logger.Error("Failed to update editor sales", "error", err)
 			return err
 		}
 	}
@@ -110,34 +99,26 @@ func (s *PerformanceService) ProcessSaleAttributedEvent(ctx context.Context, dat
 	// Update specialist_sales
 	if event.SpecialistID != "" {
 		if err := s.repo.UpsertSpecialistSales(ctx, event.SpecialistID, event.CampaignID, event.Amount, event.Currency); err != nil {
-			logger.Error("Failed to update specialist sales", "error", err)
 			return err
 		}
 	}
 
 	// Update campaign_sales
 	if err := s.repo.UpsertCampaignSales(ctx, event.CampaignID, event.Amount, event.Currency, time.Time{}, time.Time{}); err != nil {
-		logger.Error("Failed to update campaign sales", "error", err)
 		return err
 	}
 
 	// Insert daily metric
 	date := event.Timestamp.UTC().Truncate(24 * time.Hour)
 	if err := s.repo.InsertDailyMetric(ctx, date, event.VideoID, event.CampaignID, 1, event.Amount); err != nil {
-		logger.Error("Failed to insert daily metric", "error", err)
 		return err
 	}
 
 	// Optionally recalculate leaderboard for the brief
 	if event.BriefID != "" {
-		if err := s.repo.CalculateAndStoreLeaderboard(ctx, event.BriefID, "video"); err != nil {
-			logger.Warn("Failed to recalculate video leaderboard", "error", err)
-		}
-		if err := s.repo.CalculateAndStoreLeaderboard(ctx, event.BriefID, "editor"); err != nil {
-			logger.Warn("Failed to recalculate editor leaderboard", "error", err)
-		}
+		_ = s.repo.CalculateAndStoreLeaderboard(ctx, event.BriefID, "video")
+		_ = s.repo.CalculateAndStoreLeaderboard(ctx, event.BriefID, "editor")
 	}
 
-	logger.Info("Successfully processed sale attributed event", "sale_id", event.SaleID)
 	return nil
 }

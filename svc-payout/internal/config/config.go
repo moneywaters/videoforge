@@ -80,7 +80,7 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Server:   serverConfig,
+		Server:   *serverConfig,
 		Database: DatabaseConfig{Pool: pool, URL: dbURL},
 	}, nil
 }

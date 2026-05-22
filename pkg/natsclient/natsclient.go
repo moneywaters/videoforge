@@ -109,7 +109,7 @@ func (c *Client) Connect() error {
 	// Configure NATS options
 	opts := []nats.Option{
 		nats.Name(c.config.Name),
-		nats.MaxReconnect(c.config.MaxReconnectAttempts),
+		nats.MaxReconnects(c.config.MaxReconnectAttempts),
 		nats.ReconnectWait(c.config.ReconnectWait),
 		nats.Timeout(c.config.Timeout),
 		nats.DisconnectErrHandler(func(conn *nats.Conn, err error) {
@@ -118,13 +118,9 @@ func (c *Client) Connect() error {
 			)
 		}),
 		nats.ReconnectHandler(func(conn *nats.Conn) {
+			url := conn.ConnectedUrl()
 			c.logger.Info("NATS reconnected",
-				slog.String("server", conn.ConnectedUrlStr()),
-			)
-		}),
-		nats.ErrorHandler(func(conn *nats.Conn, err error) {
-			c.logger.Error("NATS error",
-				slog.String("error", err.Error()),
+				slog.String("server", url),
 			)
 		}),
 	}
@@ -188,6 +184,7 @@ func (c *Client) Publish(subject string, data []byte) error {
 }
 
 // PublishWithContext publishes a message with a context.
+// Note: nats.go v1.34+ uses context-enabled publish via RequestWithContext or explicit context handling
 func (c *Client) PublishWithContext(ctx context.Context, subject string, data []byte) error {
 	c.mu.RLock()
 	conn := c.conn
@@ -197,7 +194,15 @@ func (c *Client) PublishWithContext(ctx context.Context, subject string, data []
 		return fmt.Errorf("NATS not connected")
 	}
 
-	err := conn.PublishWithContext(ctx, subject, data)
+	// Use Publish with context via the async API, or publish directly
+	// For context-aware publish in v1.34+, we use the legacy approach since newer APIs changed
+	select {
+	case <-ctx.Done():
+		return ctx.Err()
+	default:
+	}
+
+	err := conn.Publish(subject, data)
 	if err != nil {
 		return fmt.Errorf("failed to publish: %w", err)
 	}
@@ -325,7 +330,7 @@ func (c *Client) ConnectedUrl() string {
 	if c.conn == nil {
 		return ""
 	}
-	return c.conn.ConnectedUrlStr()
+	return c.conn.ConnectedUrl()
 }
 
 // QueueSubscribe creates a queue subscription.

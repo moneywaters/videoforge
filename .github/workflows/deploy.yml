@@ -17,6 +17,25 @@ jobs:
             app: videoforge-gateway
           - name: brief
             app: videoforge-brief
+          - name: video
+            app: videoforge-video
+          - name: campaign
+            app: videoforge-campaign
+          - name: shopify
+            app: videoforge-shopify
+          - name: performance
+            app: videoforge-performance
+          - name: notification
+            app: videoforge-notification
+          - name: payout
+            app: videoforge-payout
+          - name: admin
+            app: videoforge-admin
+          - name: ai-support
+            app: videoforge-ai-support
+    concurrency:
+      group: deploy-${{ matrix.service.app }}
+      cancel-in-progress: false
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
@@ -28,9 +47,8 @@ jobs:
         run: |
           cp svc-${{ matrix.service.name }}/fly.toml ./fly-${{ matrix.service.name }}.toml
           sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-${{ matrix.service.name }}.toml
-          sed -i 's|app = ".*"|app = "${{ matrix.service.app }}"|' ./fly-${{ matrix.service.name }}.toml
 
       - name: Deploy to Fly.io
-        run: flyctl deploy --config ./fly-${{ matrix.service.name }}.toml --yes
+        run: flyctl deploy --config ./fly-${{ matrix.service.name }}.toml --app ${{ matrix.service.app }} --yes
         env:
           FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}

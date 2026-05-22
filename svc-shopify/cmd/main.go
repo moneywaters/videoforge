@@ -15,14 +15,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/natsclient"
 
 	cfg "github.com/videoforge/backend/svc-shopify/internal/config"
 	shopifyhandler "github.com/videoforge/backend/svc-shopify/internal/handler"
-	"github.com/videoforge/backend/svc-shopify/internal/middleware/auth"
 	"github.com/videoforge/backend/svc-shopify/internal/repository"
 	"github.com/videoforge/backend/svc-shopify/internal/service"
 )
@@ -36,7 +34,7 @@ func main() {
 	}
 
 	log := logger.Default(configuration.Server.Environment)
-	ctx := logger.FromContext(context.Background()).Context(context.Background())
+	_ = logger.FromContext(context.Background()).Context(context.Background())
 
 	// Connect to NATS
 	nc := natsclient.New(nil, log)
@@ -117,7 +115,7 @@ func main() {
 
 	// Add auth middleware if public key is available
 	if publicKey != nil {
-		authMiddleware := auth.NewAuthMiddleware(publicKey)
+		authMiddleware := middleware.NewAuthMiddleware(publicKey)
 		chain = middleware.Chain(chain, func(next http.Handler) http.Handler {
 			return authMiddleware.Authenticate(next)
 		})
@@ -127,7 +125,7 @@ func main() {
 	}
 
 	server := &http.Server{
-		Addr:         configuration.Server.GetAddress(),
+		Addr:         ":" + configuration.Server.Port,
 		Handler:      chain,
 		ReadTimeout:  30 * time.Second,
 		WriteTimeout: 30 * time.Second,

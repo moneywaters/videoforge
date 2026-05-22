@@ -7,8 +7,8 @@ import (
 	"time"
 
 	"github.com/google/uuid"
-	"svc-admin/internal/model"
-	"svc-admin/internal/repository"
+	"github.com/videoforge/backend/svc-admin/internal/model"
+	"github.com/videoforge/backend/svc-admin/internal/repository"
 
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/pkg/middleware"

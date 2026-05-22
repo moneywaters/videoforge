@@ -2,13 +2,12 @@ package handler
 
 import (
 	"encoding/json"
-	"fmt"
 	"io"
 	"net/http"
 	"time"
 
 	"github.com/google/uuid"
-	"github.com/gorilla/m"
+	"github.com/gorilla/mux"
 
 	"github.com/videoforge/backend/pkg/errors"
 	"github.com/videoforge/backend/svc-payout/internal/model"
@@ -38,7 +37,7 @@ func (h *PayoutHandler) GetPayouts(w http.ResponseWriter, r *http.Request) {
 	if userIDStr != "" {
 		userID, err = uuid.Parse(userIDStr)
 		if err != nil {
-			errors.BadRequest(w, r, "invalid user_id")
+			errors.Write(r.Context(), w, errors.BadRequest("invalid user_id"))
 			return
 		}
 	}
@@ -47,7 +46,7 @@ func (h *PayoutHandler) GetPayouts(w http.ResponseWriter, r *http.Request) {
 	if userIDStr == "" {
 		payouts, err := h.svc.GetAllPayouts(ctx)
 		if err != nil {
-			errors.InternalError(w, r, err)
+			errors.Write(r.Context(), w, errors.Internal(err.Error()))
 			return
 		}
 		success(w, r, payouts)
@@ -56,7 +55,7 @@ func (h *PayoutHandler) GetPayouts(w http.ResponseWriter, r *http.Request) {
 
 	payouts, err := h.svc.GetPayoutsForUser(ctx, userID)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 	success(w, r, payouts)
@@ -69,19 +68,19 @@ func (h *PayoutHandler) GetPayoutByID(w http.ResponseWriter, r *http.Request) {
 
 	payoutID, ok := vars["id"]
 	if !ok {
-		errors.BadRequest(w, r, "payout id required")
+		errors.Write(r.Context(), w, errors.BadRequest("payout id required"))
 		return
 	}
 
 	id, err := uuid.Parse(payoutID)
 	if err != nil {
-		errors.BadRequest(w, r, "invalid payout id")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid payout id"))
 		return
 	}
 
 	payout, err := h.svc.GetPayoutByID(ctx, id)
 	if err != nil {
-		errors.NotFound(w, r, "payout not found")
+		errors.Write(r.Context(), w, errors.NotFound("payout not found"))
 		return
 	}
 
@@ -95,19 +94,19 @@ func (h *PayoutHandler) GetBalance(w http.ResponseWriter, r *http.Request) {
 	// Get user from query param
 	userIDStr := r.URL.Query().Get("user_id")
 	if userIDStr == "" {
-		errors.BadRequest(w, r, "user_id required")
+		errors.Write(r.Context(), w, errors.BadRequest("user_id required"))
 		return
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		errors.BadRequest(w, r, "invalid user_id")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid user_id"))
 		return
 	}
 
 	balance, err := h.svc.GetBalance(ctx, userID)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -120,13 +119,13 @@ func (h *PayoutHandler) GetEarnings(w http.ResponseWriter, r *http.Request) {
 
 	userIDStr := r.URL.Query().Get("user_id")
 	if userIDStr == "" {
-		errors.BadRequest(w, r, "user_id required")
+		errors.Write(r.Context(), w, errors.BadRequest("user_id required"))
 		return
 	}
 
 	userID, err := uuid.Parse(userIDStr)
 	if err != nil {
-		errors.BadRequest(w, r, "invalid user_id")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid user_id"))
 		return
 	}
 
@@ -140,7 +139,7 @@ func (h *PayoutHandler) GetEarnings(w http.ResponseWriter, r *http.Request) {
 	if periodStart != "" {
 		startTime, err = time.Parse(time.RFC3339, periodStart)
 		if err != nil {
-			errors.BadRequest(w, r, "invalid period_start format")
+			errors.Write(r.Context(), w, errors.BadRequest("invalid period_start format"))
 			return
 		}
 	}
@@ -148,14 +147,14 @@ func (h *PayoutHandler) GetEarnings(w http.ResponseWriter, r *http.Request) {
 	if periodEnd != "" {
 		endTime, err = time.Parse(time.RFC3339, periodEnd)
 		if err != nil {
-			errors.BadRequest(w, r, "invalid period_end format")
+			errors.Write(r.Context(), w, errors.BadRequest("invalid period_end format"))
 			return
 		}
 	}
 
 	breakdown, err := h.svc.CalculateEarnings(ctx, userID, startTime, endTime)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -168,25 +167,25 @@ func (h *PayoutHandler) CalculateEarnings(w http.ResponseWriter, r *http.Request
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		errors.BadRequest(w, r, "failed to read request body")
+		errors.Write(r.Context(), w, errors.BadRequest("failed to read request body"))
 		return
 	}
 	defer r.Body.Close()
 
 	var req model.CalculateEarningsRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		errors.BadRequest(w, r, "invalid request body")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid request body"))
 		return
 	}
 
 	if req.UserID == uuid.Nil {
-		errors.BadRequest(w, r, "user_id required")
+		errors.Write(r.Context(), w, errors.BadRequest("user_id required"))
 		return
 	}
 
 	breakdown, err := h.svc.CalculateEarnings(ctx, req.UserID, req.PeriodStart, req.PeriodEnd)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -199,25 +198,25 @@ func (h *PayoutHandler) CreateBatch(w http.ResponseWriter, r *http.Request) {
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		errors.BadRequest(w, r, "failed to read request body")
+		errors.Write(r.Context(), w, errors.BadRequest("failed to read request body"))
 		return
 	}
 	defer r.Body.Close()
 
 	var req model.CreateBatchRequest
 	if err := json.Unmarshal(body, &req); err != nil {
-		errors.BadRequest(w, r, "invalid request body")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid request body"))
 		return
 	}
 
 	if len(req.UserIDs) == 0 {
-		errors.BadRequest(w, r, "user_ids required")
+		errors.Write(r.Context(), w, errors.BadRequest("user_ids required"))
 		return
 	}
 
 	batch, err := h.svc.CreateRuulBatch(ctx, req.UserIDs, req.Description)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -230,7 +229,7 @@ func (h *PayoutHandler) GetBatches(w http.ResponseWriter, r *http.Request) {
 
 	batches, err := h.svc.GetAllRuulBatches(ctx)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -244,19 +243,19 @@ func (h *PayoutHandler) GetBatchByID(w http.ResponseWriter, r *http.Request) {
 
 	batchID, ok := vars["id"]
 	if !ok {
-		errors.BadRequest(w, r, "batch id required")
+		errors.Write(r.Context(), w, errors.BadRequest("batch id required"))
 		return
 	}
 
 	id, err := uuid.Parse(batchID)
 	if err != nil {
-		errors.BadRequest(w, r, "invalid batch id")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid batch id"))
 		return
 	}
 
 	batch, err := h.svc.GetRuulBatch(ctx, id)
 	if err != nil {
-		errors.NotFound(w, r, "batch not found")
+		errors.Write(r.Context(), w, errors.NotFound("batch not found"))
 		return
 	}
 
@@ -270,19 +269,19 @@ func (h *PayoutHandler) ProcessBatch(w http.ResponseWriter, r *http.Request) {
 
 	batchID, ok := vars["id"]
 	if !ok {
-		errors.BadRequest(w, r, "batch id required")
+		errors.Write(r.Context(), w, errors.BadRequest("batch id required"))
 		return
 	}
 
 	id, err := uuid.Parse(batchID)
 	if err != nil {
-		errors.BadRequest(w, r, "invalid batch id")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid batch id"))
 		return
 	}
 
 	batch, err := h.svc.ProcessRuulBatch(ctx, id)
 	if err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -295,19 +294,19 @@ func (h *PayoutHandler) HandleDodoWebhook(w http.ResponseWriter, r *http.Request
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		errors.BadRequest(w, r, "failed to read request body")
+		errors.Write(r.Context(), w, errors.BadRequest("failed to read request body"))
 		return
 	}
 	defer r.Body.Close()
 
 	var event model.DodoWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		errors.BadRequest(w, r, "invalid webhook body")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid webhook body"))
 		return
 	}
 
 	if err := h.svc.HandleDodoWebhook(ctx, event); err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 
@@ -321,19 +320,19 @@ func (h *PayoutHandler) HandleRuulWebhook(w http.ResponseWriter, r *http.Request
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		errors.BadRequest(w, r, "failed to read request body")
+		errors.Write(r.Context(), w, errors.BadRequest("failed to read request body"))
 		return
 	}
 	defer r.Body.Close()
 
 	var event model.RuulWebhookEvent
 	if err := json.Unmarshal(body, &event); err != nil {
-		errors.BadRequest(w, r, "invalid webhook body")
+		errors.Write(r.Context(), w, errors.BadRequest("invalid webhook body"))
 		return
 	}
 
 	if err := h.svc.HandleRuulWebhook(ctx, event); err != nil {
-		errors.InternalError(w, r, err)
+		errors.Write(r.Context(), w, errors.Internal(err.Error()))
 		return
 	}
 

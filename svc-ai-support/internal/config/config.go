@@ -47,9 +47,14 @@ type NATSConfig struct {
 
 // Load loads configuration from environment
 func Load() (*Config, error) {
-	serverConfig, err := config.Load("")
+	serverCfg, err := config.Load("")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load server config: %w", err)
+	}
+
+	serverConfig := config.ServerConfig{
+		Port:        serverCfg.Port,
+		Environment: serverCfg.Environment,
 	}
 
 	// Priority: NEON_DATABASE_URL_* > DATABASE_URL > local postgres

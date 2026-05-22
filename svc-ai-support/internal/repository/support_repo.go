@@ -2,6 +2,7 @@ package repository
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -10,10 +11,7 @@ import (
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgxpool"
-	"github.com/jackc/pgx/v5/pgtype"
-	"svc-ai-support/internal/model"
-
-	backenderrors "github.com/videoforge/backend/pkg/errors"
+	"github.com/videoforge/backend/svc-ai-support/internal/model"
 )
 
 var (
@@ -85,7 +83,7 @@ func (r *SupportRepository) GetConversation(ctx context.Context, id, userID uuid
 		WHERE id = $1 AND user_id = $2
 	`
 	var conv model.Conversation
-	var closedAt pgtype.NullTime
+	var closedAt sql.NullTime
 	err := r.db.QueryRow(ctx, query, id, userID).Scan(
 		&conv.ID,
 		&conv.UserID,
@@ -125,7 +123,7 @@ func (r *SupportRepository) GetConversations(ctx context.Context, userID uuid.UU
 	var conversations []model.Conversation
 	for rows.Next() {
 		var conv model.Conversation
-		var closedAt pgtype.NullTime
+		var closedAt sql.NullTime
 		if err := rows.Scan(
 			&conv.ID,
 			&conv.UserID,
@@ -282,8 +280,10 @@ func (r *SupportRepository) GetEscalation(ctx context.Context, id uuid.UUID) (*m
 		WHERE id = $1
 	`
 	var esc model.Escalation
-	var adminID, notes, resolvedAt pgtype.NullUUID
-	var reason pgtype.NullText
+	var adminID sql.NullString
+	var notes sql.NullString
+	var resolvedAt sql.NullTime
+	var reason sql.NullString
 	err := r.db.QueryRow(ctx, query, id).Scan(
 		&esc.ID,
 		&esc.ConversationID,
@@ -305,7 +305,13 @@ func (r *SupportRepository) GetEscalation(ctx context.Context, id uuid.UUID) (*m
 		esc.Reason = reason.String
 	}
 	if adminID.Valid {
-		esc.AdminID = &adminID.UUID
+		esc.AdminID = func() *uuid.UUID {
+		if !adminID.Valid {
+			return nil
+		}
+		id, _ := uuid.Parse(adminID.String)
+		return &id
+	}()
 	}
 	if notes.Valid {
 		esc.Notes = notes.String
@@ -348,9 +354,10 @@ func (r *SupportRepository) GetEscalations(ctx context.Context, adminID *uuid.UU
 	var escalations []model.Escalation
 	for rows.Next() {
 		var esc model.Escalation
-		var adminID, notes pgtype.NullUUID
-		var reason pgtype.NullText
-		var resolvedAt pgtype.NullTime
+		var adminID sql.NullString
+		var notes sql.NullString
+		var reason sql.NullString
+		var resolvedAt sql.NullTime
 		if err := rows.Scan(
 			&esc.ID,
 			&esc.ConversationID,
@@ -368,7 +375,13 @@ func (r *SupportRepository) GetEscalations(ctx context.Context, adminID *uuid.UU
 			esc.Reason = reason.String
 		}
 		if adminID.Valid {
-			esc.AdminID = &adminID.UUID
+			esc.AdminID = func() *uuid.UUID {
+		if !adminID.Valid {
+			return nil
+		}
+		id, _ := uuid.Parse(adminID.String)
+		return &id
+	}()
 		}
 		if notes.Valid {
 			esc.Notes = notes.String

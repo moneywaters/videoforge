@@ -26,7 +26,7 @@ type DatabaseConfig struct {
 
 // Load loads configuration from environment variables
 func Load() (*Config, error) {
-	serverConfig, err := config.Load()
+	serverConfig, err := config.LoadServer("")
 	if err != nil {
 		return nil, fmt.Errorf("failed to load server config: %w", err)
 	}
@@ -78,7 +78,7 @@ func Load() (*Config, error) {
 	}
 
 	return &Config{
-		Server:   serverConfig,
+		Server:   *serverConfig,
 		Database: DatabaseConfig{Pool: pool, URL: dbURL},
 		JWTKey:   jwtKey,
 	}, nil

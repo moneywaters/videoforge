@@ -1,7 +1,6 @@
 package handler
 
 import (
-	"context"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -115,7 +114,7 @@ func (h *ShopifyHandler) HandleCreateLink(w http.ResponseWriter, r *http.Request
 	// Parse request body
 	var req model.CreateLinkRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
-		h.log.Error("Failed to parse request body", slog.String("error", err.Error())))
+		h.log.Error("Failed to parse request body", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.BadRequest("invalid request body"))
 		return
 	}
@@ -137,7 +136,7 @@ func (h *ShopifyHandler) HandleCreateLink(w http.ResponseWriter, r *http.Request
 	// Create the link
 	link, err := h.service.CreateLink(ctx, &req)
 	if err != nil {
-		h.log.Error("Failed to create link", slog.String("error", err.Error())))
+		h.log.Error("Failed to create link", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.Internal(fmt.Sprintf("failed to create link: %v", err)))
 		return
 	}
@@ -165,7 +164,7 @@ func (h *ShopifyHandler) HandleListLinks(w http.ResponseWriter, r *http.Request)
 	// List links
 	links, err := h.service.ListLinks(ctx, videoID, campaignID)
 	if err != nil {
-		h.log.Error("Failed to list links", slog.String("error", err.Error())))
+		h.log.Error("Failed to list links", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.Internal(fmt.Sprintf("failed to list links: %v", err)))
 		return
 	}
@@ -197,7 +196,7 @@ func (h *ShopifyHandler) HandleGetLink(w http.ResponseWriter, r *http.Request) {
 	// Get the link
 	link, err := h.service.GetLink(ctx, id)
 	if err != nil {
-		h.log.Error("Failed to get link", slog.String("error", err.Error())))
+		h.log.Error("Failed to get link", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.NotFound(fmt.Sprintf("link not found: %v", err)))
 		return
 	}
@@ -229,7 +228,7 @@ func (h *ShopifyHandler) HandleListOrders(w http.ResponseWriter, r *http.Request
 	// List orders
 	orders, err := h.service.ListOrders(ctx, storeID, videoID, status)
 	if err != nil {
-		h.log.Error("Failed to list orders", slog.String("error", err.Error())))
+		h.log.Error("Failed to list orders", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.Internal(fmt.Sprintf("failed to list orders: %v", err)))
 		return
 	}
@@ -261,7 +260,7 @@ func (h *ShopifyHandler) HandleGetOrder(w http.ResponseWriter, r *http.Request) 
 	// Get the order
 	order, err := h.service.GetOrder(ctx, id)
 	if err != nil {
-		h.log.Error("Failed to get order", slog.String("error", err.Error())))
+		h.log.Error("Failed to get order", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.NotFound(fmt.Sprintf("order not found: %v", err)))
 		return
 	}
@@ -292,7 +291,7 @@ func (h *ShopifyHandler) HandleListAttributions(w http.ResponseWriter, r *http.R
 	// List attributions
 	attributions, err := h.service.GetAttributions(ctx, videoID, campaignID)
 	if err != nil {
-		h.log.Error("Failed to list attributions", slog.String("error", err.Error())))
+		h.log.Error("Failed to list attributions", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.Internal(fmt.Sprintf("failed to list attributions: %v", err)))
 		return
 	}
@@ -321,7 +320,7 @@ func (h *ShopifyHandler) HandleGetAttributionSummary(w http.ResponseWriter, r *h
 	// Get summaries
 	summaries, err := h.service.GetAttributionSummaries(ctx)
 	if err != nil {
-		h.log.Error("Failed to get attribution summaries", slog.String("error", err.Error())))
+		h.log.Error("Failed to get attribution summaries", slog.String("error", err.Error()))
 		errors.WriteError(ctx, w, errors.Internal(fmt.Sprintf("failed to get attribution summaries: %v", err)))
 		return
 	}

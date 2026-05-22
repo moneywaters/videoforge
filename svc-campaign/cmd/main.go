@@ -15,10 +15,10 @@ import (
 	"github.com/videoforge/backend/pkg/middleware"
 	"github.com/videoforge/backend/pkg/natsclient"
 
-	svcconfig "svc-campaign/internal/config"
-	"svc-campaign/internal/handler"
-	"svc-campaign/internal/repository"
-	"svc-campaign/internal/service"
+	svcconfig "github.com/videoforge/backend/svc-campaign/internal/config"
+	"github.com/videoforge/backend/svc-campaign/internal/handler"
+	"github.com/videoforge/backend/svc-campaign/internal/repository"
+	"github.com/videoforge/backend/svc-campaign/internal/service"
 )
 
 func main() {
@@ -29,7 +29,6 @@ func main() {
 	}
 
 	log := logger.Default(cfg.Server.Environment)
-	ctx := logger.FromContext(context.Background()).Context(context.Background())
 
 	// Connect to NATS (optional)
 	nc := natsclient.New(nil, log)

@@ -8,8 +8,7 @@ import (
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgtype"
 	"github.com/videoforge/backend/pkg/errors"
-	"github.com/videoforge/backend/pkg/logger"
-	"svc-performance/internal/model"
+	"github.com/videoforge/backend/svc-performance/internal/model"
 )
 
 type PerformanceRepository struct {
@@ -38,7 +37,6 @@ func (r *PerformanceRepository) GetVideoSales(ctx context.Context, videoID strin
 		if err == pgx.ErrNoRows {
 			return nil, errors.NotFound("video sales not found")
 		}
-		logger.Error("Failed to get video sales", "error", err, "video_id", videoID)
 		return nil, err
 	}
 	return &sales, nil
@@ -57,7 +55,6 @@ func (r *PerformanceRepository) UpsertVideoSales(ctx context.Context, videoID, c
 
 	_, err := r.db.Exec(ctx, query, videoID, campaignID, amount, currency)
 	if err != nil {
-		logger.Error("Failed to upsert video sales", "error", err, "video_id", videoID)
 		return err
 	}
 	return nil
@@ -81,7 +78,6 @@ func (r *PerformanceRepository) GetEditorSales(ctx context.Context, editorID str
 		if err == pgx.ErrNoRows {
 			return nil, errors.NotFound("editor sales not found")
 		}
-		logger.Error("Failed to get editor sales", "error", err, "editor_id", editorID)
 		return nil, err
 	}
 	return &sales, nil
@@ -99,7 +95,6 @@ func (r *PerformanceRepository) UpsertEditorSales(ctx context.Context, editorID 
 
 	_, err := r.db.Exec(ctx, query, editorID, amount, currency)
 	if err != nil {
-		logger.Error("Failed to upsert editor sales", "error", err, "editor_id", editorID)
 		return err
 	}
 	return nil
@@ -123,7 +118,6 @@ func (r *PerformanceRepository) GetSpecialistSales(ctx context.Context, speciali
 		if err == pgx.ErrNoRows {
 			return nil, errors.NotFound("specialist sales not found")
 		}
-		logger.Error("Failed to get specialist sales", "error", err, "specialist_id", specialistID)
 		return nil, err
 	}
 	return &sales, nil
@@ -142,7 +136,6 @@ func (r *PerformanceRepository) UpsertSpecialistSales(ctx context.Context, speci
 
 	_, err := r.db.Exec(ctx, query, specialistID, amount, currency)
 	if err != nil {
-		logger.Error("Failed to upsert specialist sales", "error", err, "specialist_id", specialistID)
 		return err
 	}
 	return nil
@@ -166,7 +159,6 @@ func (r *PerformanceRepository) GetCampaignSales(ctx context.Context, campaignID
 		if err == pgx.ErrNoRows {
 			return nil, errors.NotFound("campaign sales not found")
 		}
-		logger.Error("Failed to get campaign sales", "error", err, "campaign_id", campaignID)
 		return nil, err
 	}
 	return &sales, nil
@@ -184,7 +176,6 @@ func (r *PerformanceRepository) UpsertCampaignSales(ctx context.Context, campaig
 
 	_, err := r.db.Exec(ctx, query, campaignID, amount, currency, startDate, endDate)
 	if err != nil {
-		logger.Error("Failed to upsert campaign sales", "error", err, "campaign_id", campaignID)
 		return err
 	}
 	return nil
@@ -202,7 +193,6 @@ func (r *PerformanceRepository) GetLeaderboard(ctx context.Context, briefID stri
 
 	rows, err := r.db.Query(ctx, query, briefID, entityType)
 	if err != nil {
-		logger.Error("Failed to get leaderboard", "error", err, "brief_id", briefID, "entity_type", entityType)
 		return nil, err
 	}
 	defer rows.Close()
@@ -215,7 +205,6 @@ func (r *PerformanceRepository) GetLeaderboard(ctx context.Context, briefID stri
 			&entry.Rank, &entry.TotalRevenue, &entry.TotalOrders, &entry.UpdatedAt,
 		)
 		if err != nil {
-			logger.Error("Failed to scan leaderboard entry", "error", err)
 			return nil, err
 		}
 		entries = append(entries, entry)
@@ -234,7 +223,6 @@ func (r *PerformanceRepository) GetLeaderboardRankings(ctx context.Context, brie
 
 	rows, err := r.db.Query(ctx, query, briefID, entityType, limit, offset)
 	if err != nil {
-		logger.Error("Failed to get leaderboard rankings", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -247,7 +235,6 @@ func (r *PerformanceRepository) GetLeaderboardRankings(ctx context.Context, brie
 			&entry.Rank, &entry.TotalRevenue, &entry.TotalOrders, &entry.UpdatedAt,
 		)
 		if err != nil {
-			logger.Error("Failed to scan leaderboard entry", "error", err)
 			return nil, err
 		}
 		entries = append(entries, entry)
@@ -311,7 +298,6 @@ func (r *PerformanceRepository) CalculateAndStoreLeaderboard(ctx context.Context
 
 	_, err := r.db.Exec(ctx, rankingQuery, briefID)
 	if err != nil {
-		logger.Error("Failed to calculate leaderboard", "error", err, "brief_id", briefID, "entity_type", entityType)
 		return err
 	}
 	return nil
@@ -330,7 +316,6 @@ func (r *PerformanceRepository) InsertDailyMetric(ctx context.Context, date time
 
 	_, err := r.db.Exec(ctx, query, date, videoID, campaignID, orders, revenue)
 	if err != nil {
-		logger.Error("Failed to insert daily metric", "error", err)
 		return err
 	}
 	return nil
@@ -373,7 +358,6 @@ func (r *PerformanceRepository) GetDailyMetrics(ctx context.Context, entityType,
 	}
 
 	if err != nil {
-		logger.Error("Failed to get daily metrics", "error", err)
 		return nil, err
 	}
 	defer rows.Close()
@@ -384,7 +368,6 @@ func (r *PerformanceRepository) GetDailyMetrics(ctx context.Context, entityType,
 		var orders int
 		var revenue pgtype.Numeric
 		if err := rows.Scan(&period, &orders, &revenue); err != nil {
-			logger.Error("Failed to scan daily metric", "error", err)
 			return nil, err
 		}
 		results = append(results, map[string]interface{}{

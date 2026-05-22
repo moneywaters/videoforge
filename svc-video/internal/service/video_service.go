@@ -45,17 +45,17 @@ type videoService struct {
 // NewVideoService creates a new video service
 // If storageClient is nil, mock storage will be used (for development/testing)
 func NewVideoService(repo repository.VideoRepository, nc natsclient.NATSClient, log *logger.Logger, storageClient interface{}) VideoService {
-	var storage storage.Storage
+	var storageClientImpl storage.Storage
 	if storageClient != nil {
 		if s, ok := storageClient.(storage.Storage); ok {
-			storage = s
+			storageClientImpl = s
 		}
 	}
 	return &videoService{
 		repo:      repo,
 		natsClient: nc,
 		log:       log,
-		storage:    storage,
+		storage:   storageClientImpl,
 	}
 }
 
@@ -90,7 +90,7 @@ func (s *videoService) CreateVideo(ctx context.Context, editorID, briefID, title
 
 	if err := s.repo.Create(ctx, video); err != nil {
 		s.log.Error("failed to create video",
-			slog.String("error", err.Error())),
+			slog.String("error", err.Error()),
 		)
 		return nil, errors.Internal("failed to create video")
 	}
@@ -473,7 +473,7 @@ func (s *videoService) ApproveVideo(ctx context.Context, userID, briefClientID, 
 	}
 	if err := s.repo.CreateApproval(ctx, approval); err != nil {
 		s.log.Error("failed to create approval record",
-			slog.String("error", err.Error())),
+			slog.String("error", err.Error()),
 		)
 	}
 
@@ -539,7 +539,7 @@ func (s *videoService) RejectVideo(ctx context.Context, userID, briefClientID, v
 	}
 	if err := s.repo.CreateApproval(ctx, approval); err != nil {
 		s.log.Error("failed to create rejection record",
-			slog.String("error", err.Error())),
+			slog.String("error", err.Error()),
 		)
 	}
 
@@ -613,7 +613,7 @@ func (s *videoService) RequestRevision(ctx context.Context, userID, briefClientI
 	}
 	if err := s.repo.CreateFeedback(ctx, fb); err != nil {
 		s.log.Error("failed to create feedback record",
-			slog.String("error", err.Error())),
+			slog.String("error", err.Error()),
 		)
 	}
 

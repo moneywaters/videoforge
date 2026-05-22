@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/base64"
 	"encoding/json"
+	"fmt"
 	"log/slog"
 	"net/http"
 	"strings"
@@ -91,7 +92,7 @@ func (h *WebSocketHandler) HandleWebSocket(w http.ResponseWriter, r *http.Reques
 	}()
 
 	// Register connection in database
-	dbConn, err := h.connRepo.CreateConnection(context.Background(), userID, connectionID)
+	_, err = h.connRepo.CreateConnection(context.Background(), userID, connectionID)
 	if err != nil {
 		h.log.Error("Failed to create connection in database", slog.String("error", err.Error()))
 		conn.WriteMessage(websocket.CloseMessage, []byte(`{"type":"error","message":"Failed to register connection"}`))

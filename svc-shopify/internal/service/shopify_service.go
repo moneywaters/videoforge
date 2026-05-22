@@ -7,7 +7,6 @@ import (
 	"log/slog"
 	"net/url"
 	"strings"
-	"time"
 
 	"github.com/videoforge/backend/pkg/logger"
 	"github.com/videoforge/backend/pkg/natsclient"
@@ -176,7 +175,7 @@ func (s *PgShopifyService) ProcessWebhook(ctx context.Context, payload []byte, s
 	s.log.Info("Processed order webhook",
 		slog.String("order_id", order.ID),
 		slog.String("shopify_order_id", order.ShopifyOrderID),
-		logger.Float("total_price", order.TotalPrice),
+		slog.Float64("total_price", order.TotalPrice),
 	)
 
 	// Try to attribute the order
@@ -184,8 +183,7 @@ func (s *PgShopifyService) ProcessWebhook(ctx context.Context, payload []byte, s
 		if err := s.attributeOrder(context.Background(), order); err != nil {
 			s.log.Error("Failed to attribute order",
 				slog.String("order_id", order.ID),
-slog.String("error", err.Error())),
-			)
+				slog.String("error", err.Error()))
 		}
 	}()
 
@@ -249,7 +247,7 @@ func (s *PgShopifyService) attributeOrder(ctx context.Context, order *model.Orde
 		slog.String("order_id", order.ID),
 		slog.String("video_id", matchedLink.VideoID),
 		slog.String("method", attributionMethod),
-		logger.Float("amount", order.TotalPrice),
+		slog.Float64("amount", order.TotalPrice),
 	)
 
 	// Emit NATS event
@@ -420,16 +418,15 @@ func parsePrice(priceStr string) (float64, error) {
 		return 0, nil
 	}
 
-	// Handle various formats
+	// Handle various formats (remove currency symbols and commas)
 	priceStr = strings.ReplaceAll(priceStr, ",", "")
-
-	var t time.Time
-	_, err := t.ParseInLocation("2006-01-02 15:04:05 -0700", "2006-01-02 15:04:05 -0700", time.UTC)
-	// This is a no-op, just checking the error type
+	priceStr = strings.ReplaceAll(priceStr, "$", "")
+	priceStr = strings.ReplaceAll(priceStr, "USD", "")
+	priceStr = strings.TrimSpace(priceStr)
 
 	// Simple parsing
 	var result float64
-	_, err = fmt.Sscanf(priceStr, "%f", &result)
+	_, err := fmt.Sscanf(priceStr, "%f", &result)
 	if err != nil {
 		return 0, err
 	}

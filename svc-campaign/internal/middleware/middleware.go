@@ -13,7 +13,7 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 	"github.com/videoforge/backend/pkg/errors"
 
-	"svc-campaign/internal/config"
+	"github.com/videoforge/backend/svc-campaign/internal/config"
 )
 
 // UserIDKey is the context key for user ID
