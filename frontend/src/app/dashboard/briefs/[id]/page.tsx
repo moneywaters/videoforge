@@ -10,6 +10,7 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UploadList } from '@/components/upload/UploadList';
 import type { UploadFile } from '@/components/upload/UploadItem';
+import { BriefFileExplorer, type BriefFile } from './file-explorer';
 import type { BriefStatus, Video } from '@/types/index';
 
 const statusBadgeVariant = (status: BriefStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -74,6 +75,7 @@ export default function BriefDetailPage() {
   const uploadControllersRef = useRef<Map<string, UploadController>>(new Map());
 
   const [uploads, setUploads] = useState<UploadFile[]>([]);
+  const [briefFiles, setBriefFiles] = useState<BriefFile[]>([]);
 
   const isUploading = uploads.some((u) => u.status === 'uploading');
 
@@ -146,6 +148,18 @@ export default function BriefDetailPage() {
             u.id === uploadId ? { ...u, status: 'completed', progress: 100 } : u
           )
         );
+
+        // Add completed upload to file explorer
+        setBriefFiles((prev) => [
+          ...prev,
+          {
+            id: crypto.randomUUID(),
+            name: file.name,
+            type: file.type,
+            size: file.size,
+            uploadedAt: new Date().toISOString(),
+          },
+        ]);
       } catch (error) {
         const isCancelled =
           error instanceof Error && error.message === 'Upload cancelled';
@@ -292,6 +306,11 @@ export default function BriefDetailPage() {
             <UploadList uploads={uploads} onCancel={handleCancel} />
           </div>
         )}
+
+        <BriefFileExplorer
+          files={briefFiles}
+          onDownload={(file) => file.url && window.open(file.url, '_blank', 'noopener,noreferrer')}
+        />
       </div>
 
       <Card>
