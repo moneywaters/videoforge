@@ -245,8 +245,6 @@ func handleRegister(w http.ResponseWriter, r *http.Request) {
 		"client":       true,
 		"editor":       true,
 		"ad_specialist": true,
-		"admin":        true,
-		"support_ai":   true,
 	}
 	role := req.Role
 	if role == "" {

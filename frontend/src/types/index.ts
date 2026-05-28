@@ -1,9 +1,7 @@
 export type UserRole =
   | 'client'
   | 'editor'
-  | 'ad_specialist'
-  | 'admin'
-  | 'support_ai';
+  | 'ad_specialist';
 
 export interface User {
   id: string;

@@ -33,9 +33,7 @@ CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role_id);
 INSERT INTO roles (id, name, description) VALUES 
     (uuid_generate_v4(), 'client', 'Regular client user'),
     (uuid_generate_v4(), 'editor', 'Content editor with modification access'),
-    (uuid_generate_v4(), 'ad_specialist', 'Advertising specialist'),
-    (uuid_generate_v4(), 'admin', 'System administrator'),
-    (uuid_generate_v4(), 'support_ai', 'AI-powered support assistant')
+    (uuid_generate_v4(), 'ad_specialist', 'Advertising specialist')
 ON CONFLICT (name) DO NOTHING;
 
 -- Insert default permissions

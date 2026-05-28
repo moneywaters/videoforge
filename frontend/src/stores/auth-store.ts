@@ -111,8 +111,6 @@ export const useAuthStore = create<AuthState>()(
 
 export const hasHydrated = () => useAuthStore.getState()._hasHydrated;
 
-export const isAdmin = (): boolean =>
-  useAuthStore.getState().user?.role === 'admin';
 export const isClient = (): boolean =>
   useAuthStore.getState().user?.role === 'client';
 export const isEditor = (): boolean =>

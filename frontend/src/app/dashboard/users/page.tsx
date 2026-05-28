@@ -17,15 +17,12 @@ const ROLE_OPTIONS = [
   { value: 'client', label: 'Client' },
   { value: 'editor', label: 'Editor' },
   { value: 'ad_specialist', label: 'Ad Specialist' },
-  { value: 'admin', label: 'Admin' },
 ];
 
 const ROLE_BADGE_VARIANTS: Record<UserRole, 'default' | 'secondary' | 'destructive' | 'outline'> = {
   client: 'secondary',
   editor: 'default',
   ad_specialist: 'secondary',
-  admin: 'destructive',
-  support_ai: 'outline',
 };
 
 export default function UsersPage() {

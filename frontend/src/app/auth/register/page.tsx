@@ -196,8 +196,6 @@ export default function RegisterPage() {
                   <SelectItem value='client'>Client (Brand)</SelectItem>
                   <SelectItem value='editor'>Editor / Creator</SelectItem>
                   <SelectItem value='ad_specialist'>Ad Specialist</SelectItem>
-                  <SelectItem value='admin'>Admin</SelectItem>
-                  <SelectItem value='support_ai'>Support AI</SelectItem>
                 </SelectContent>
               </Select>
             </div>
