@@ -13,6 +13,7 @@ import { api } from '@/lib/api';
 
 export default function LoginPage() {
   const router = useRouter();
+  const setUser = useAuthStore((state) => state.setUser);
   const { loginWithGoogle } = useAuthStore();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -29,7 +30,8 @@ export default function LoginPage() {
     setIsLoading(true);
 
     try {
-      await api.login(email, password);
+      const user = await api.login(email, password);
+      setUser(user);
       router.push('/dashboard');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Login failed');
