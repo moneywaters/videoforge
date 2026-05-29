@@ -4,6 +4,7 @@ import { useState, useRef } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
+import { generateThumbnail } from './thumbnail-utils';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -152,6 +153,9 @@ export default function BriefDetailPage() {
           )
         );
 
+        // Generate thumbnail for images and videos asynchronously
+        const thumbnailUrl = await generateThumbnail(file);
+
         // Add completed upload to file explorer
         setBriefFiles((prev) => [
           ...prev,
@@ -161,6 +165,7 @@ export default function BriefDetailPage() {
             type: file.type,
             size: file.size,
             uploadedAt: new Date().toISOString(),
+            thumbnailUrl: thumbnailUrl ?? undefined,
           },
         ]);
       } catch (error) {

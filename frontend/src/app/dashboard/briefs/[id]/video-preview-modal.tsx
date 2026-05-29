@@ -60,6 +60,8 @@ export function VideoPreviewModal({ url, title, onClose }: VideoPreviewModalProp
           className="w-full max-h-[80vh] block"
           playsInline
           preload="metadata"
+          autoPlay
+          muted
         >
           Your browser does not support the video tag.
         </video>

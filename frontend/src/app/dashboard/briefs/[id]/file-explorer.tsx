@@ -27,6 +27,7 @@ export interface BriefFile {
   size: number;
   uploadedAt: string;
   url?: string;
+  thumbnailUrl?: string;
 }
 
 interface BriefFileExplorerProps {
@@ -170,6 +171,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
               {sorted.map((file) => {
                 const Icon = getFileIcon(file.type);
                 const isActive = selectedId === file.id;
+                const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
                 return (
                   <button
                     key={file.id}
@@ -182,7 +184,16 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                         : 'border-border hover:border-foreground/20 hover:bg-muted/50'
                     )}
                   >
-                    <Icon className="text-muted-foreground" style={{ width: iconSize, height: iconSize }} />
+                    {isMedia && file.thumbnailUrl ? (
+                      <img
+                        src={file.thumbnailUrl}
+                        alt={file.name}
+                        className="object-cover rounded-md"
+                        style={{ width: iconSize, height: iconSize }}
+                      />
+                    ) : (
+                      <Icon className="text-muted-foreground" style={{ width: iconSize, height: iconSize }} />
+                    )}
                     <span className="text-xs truncate w-full" title={file.name}>
                       {file.name}
                     </span>
@@ -283,16 +294,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                 </div>
               </div>
 
-              {selected.type.startsWith('video/') && onPreview && (
-                <Button
-                  size="sm"
-                  variant="secondary"
-                  className="w-full mt-2"
-                  onClick={() => onPreview(selected)}
-                >
-                  <IconVideo className="w-4 h-4 mr-1.5" /> Play Video
-                </Button>
-              )}
+              
 
               {onDownload && selected.url && (
                 <Button
