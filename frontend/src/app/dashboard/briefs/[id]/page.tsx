@@ -11,6 +11,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { UploadList } from '@/components/upload/UploadList';
 import type { UploadFile } from '@/components/upload/UploadItem';
 import { BriefFileExplorer, type BriefFile } from './file-explorer';
+import { VideoPreviewModal } from './video-preview-modal';
 import type { BriefStatus, Video } from '@/types/index';
 
 const statusBadgeVariant = (status: BriefStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -76,6 +77,8 @@ export default function BriefDetailPage() {
 
   const [uploads, setUploads] = useState<UploadFile[]>([]);
   const [briefFiles, setBriefFiles] = useState<BriefFile[]>([]);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [previewTitle, setPreviewTitle] = useState<string>('');
 
   const isUploading = uploads.some((u) => u.status === 'uploading');
 
@@ -310,6 +313,10 @@ export default function BriefDetailPage() {
         <BriefFileExplorer
           files={briefFiles}
           onDownload={(file) => file.url && window.open(file.url, '_blank', 'noopener,noreferrer')}
+          onPreview={(file) => {
+            setPreviewTitle(file.name);
+            setPreviewUrl(file.url ?? null);
+          }}
         />
       </div>
 
@@ -348,6 +355,12 @@ export default function BriefDetailPage() {
       {brief.status === 'published' && (
         <Button className="w-full">Request More Submissions</Button>
       )}
+
+      <VideoPreviewModal
+        url={previewUrl}
+        title={previewTitle}
+        onClose={() => setPreviewUrl(null)}
+      />
     </div>
   );
 }

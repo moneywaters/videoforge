@@ -32,6 +32,7 @@ export interface BriefFile {
 interface BriefFileExplorerProps {
   files: BriefFile[];
   onDownload?: (file: BriefFile) => void;
+  onPreview?: (file: BriefFile) => void;
 }
 
 type SortKey = 'name' | 'size' | 'date';
@@ -56,7 +57,7 @@ function getFileIcon(type: string) {
   return IconFile;
 }
 
-export function BriefFileExplorer({ files, onDownload }: BriefFileExplorerProps) {
+export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExplorerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [iconSize, setIconSize] = useState(48);
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -173,6 +174,7 @@ export function BriefFileExplorer({ files, onDownload }: BriefFileExplorerProps)
                   <button
                     key={file.id}
                     onClick={() => setSelectedId(isActive ? null : file.id)}
+                    onDoubleClick={() => file.type.startsWith('video/') && onPreview?.(file)}
                     className={cn(
                       'flex flex-col items-center gap-2 p-3 rounded-lg border transition-all text-center',
                       isActive
@@ -197,6 +199,7 @@ export function BriefFileExplorer({ files, onDownload }: BriefFileExplorerProps)
                   <button
                     key={file.id}
                     onClick={() => setSelectedId(isActive ? null : file.id)}
+                    onDoubleClick={() => file.type.startsWith('video/') && onPreview?.(file)}
                     className={cn(
                       'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors',
                       isActive ? 'bg-muted' : 'hover:bg-muted/50'
@@ -279,6 +282,17 @@ export function BriefFileExplorer({ files, onDownload }: BriefFileExplorerProps)
                   <span className="font-mono text-xs">{selected.id.slice(0, 8)}</span>
                 </div>
               </div>
+
+              {selected.type.startsWith('video/') && onPreview && (
+                <Button
+                  size="sm"
+                  variant="secondary"
+                  className="w-full mt-2"
+                  onClick={() => onPreview(selected)}
+                >
+                  <IconVideo className="w-4 h-4 mr-1.5" /> Play Video
+                </Button>
+              )}
 
               {onDownload && selected.url && (
                 <Button
