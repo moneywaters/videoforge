@@ -173,12 +173,20 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                 const isActive = selectedId === file.id;
                 const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
                 return (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     key={file.id}
                     onClick={() => setSelectedId(isActive ? null : file.id)}
-                    onDoubleClick={() => file.type.startsWith('video/') && onPreview?.(file)}
+                    onDoubleClick={() => (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedId(isActive ? null : file.id);
+                      }
+                    }}
                     className={cn(
-                      'flex flex-col items-center gap-2 p-3 rounded-lg border transition-all text-center',
+                      'flex flex-col items-center gap-2 p-3 rounded-lg border transition-all text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                       isActive
                         ? 'border-primary bg-primary/5 shadow-sm'
                         : 'border-border hover:border-foreground/20 hover:bg-muted/50'
@@ -197,7 +205,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                     <span className="text-xs truncate w-full" title={file.name}>
                       {file.name}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>
@@ -207,12 +215,20 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                 const Icon = getFileIcon(file.type);
                 const isActive = selectedId === file.id;
                 return (
-                  <button
+                  <div
+                    role="button"
+                    tabIndex={0}
                     key={file.id}
                     onClick={() => setSelectedId(isActive ? null : file.id)}
-                    onDoubleClick={() => file.type.startsWith('video/') && onPreview?.(file)}
+                    onDoubleClick={() => (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        setSelectedId(isActive ? null : file.id);
+                      }
+                    }}
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors',
+                      'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                       isActive ? 'bg-muted' : 'hover:bg-muted/50'
                     )}
                   >
@@ -226,7 +242,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                     <span className="text-xs text-muted-foreground w-24 text-right hidden sm:block">
                       {new Date(file.uploadedAt).toLocaleDateString()}
                     </span>
-                  </button>
+                  </div>
                 );
               })}
             </div>

@@ -144,7 +144,20 @@ export default function BriefDetailPage() {
           },
         });
 
-        await api.confirmUpload(id, storjKey);
+await api.confirmUpload(id, storjKey, {
+          name: file.name,
+          type: file.type,
+          size: file.size,
+        });
+
+        // Fetch the presigned download URL for preview
+        let fileUrl: string | undefined;
+        try {
+          const resp = await api.getDownloadUrl(id);
+          fileUrl = resp.download_url;
+        } catch {
+          // ignore, fileUrl stays undefined
+        }
 
         anyCompleted = true;
         setUploads((prev) =>
@@ -202,8 +215,10 @@ export default function BriefDetailPage() {
 
   const handleDownload = async () => {
     try {
-      const { url } = await api.getDownloadUrl(id);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      const resp = await api.getDownloadUrl(id);
+      if (resp.download_url) {
+        window.open(resp.download_url, '_blank', 'noopener,noreferrer');
+      }
     } catch (error: unknown) {
       alert(`Download failed: ${error instanceof Error ? error.message : 'Unknown error'}`);
     }

@@ -139,7 +139,7 @@ export const api = {
     });
   },
 
-  getDownloadUrl: async (briefId: string): Promise<{ url: string }> => {
+  getDownloadUrl: async (briefId: string): Promise<{ download_url: string; expires_in: number }> => {
     return fetchWithAuth(`/briefs/${briefId}/raw-footage/download-url`, {
       method: 'GET',
     });

@@ -1,0 +1,7 @@
+{"timestamp":"2026-05-27T09:53:52.796Z","score":46,"grade":"D","targetAgent":["claude"],"trigger":"score"}
+{"timestamp":"2026-05-27T09:54:02.034Z","score":46,"grade":"D","targetAgent":["claude"],"trigger":"score"}
+{"timestamp":"2026-05-27T09:54:45.158Z","score":46,"grade":"D","targetAgent":["claude"],"trigger":"score"}
+{"timestamp":"2026-05-27T09:55:26.590Z","score":60,"grade":"C","targetAgent":["claude"],"trigger":"score"}
+{"timestamp":"2026-05-27T09:55:50.323Z","score":70,"grade":"B","targetAgent":["claude"],"trigger":"score"}
+{"timestamp":"2026-05-27T09:57:26.145Z","score":73,"grade":"B","targetAgent":["claude","codex"],"trigger":"score"}
+{"timestamp":"2026-05-27T10:09:13.575Z","score":73,"grade":"B","targetAgent":["claude","codex"],"trigger":"score"}
