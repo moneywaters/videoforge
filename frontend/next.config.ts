@@ -25,7 +25,8 @@ const baseConfig: NextConfig = {
   },
   transpilePackages: ['geist'],
   compiler: {
-    removeConsole: process.env.NODE_ENV === 'production'
+    // Temporarily disabled for OAuth debugging - re-enable after fix
+    // removeConsole: process.env.NODE_ENV === 'production'
   }
 };
 
