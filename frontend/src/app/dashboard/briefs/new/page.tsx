@@ -190,8 +190,7 @@ Format Preference: ${lengthPref}`;
   }
 
   if (step === 'interview') {
-    const showGenerateButton =
-      userAnswers.length >= AI_QUESTIONS.length && createBriefMutation.isPending;
+    const allQuestionsAnswered = userAnswers.length >= AI_QUESTIONS.length;
 
     return (
       <div className='max-w-2xl mx-auto space-y-6'>
@@ -223,15 +222,10 @@ Format Preference: ${lengthPref}`;
                 </div>
               </div>
             ))}
-            {showGenerateButton && (
-              <div className='text-center text-muted-foreground text-sm'>
-                Generating brief...
-              </div>
-            )}
             <div ref={chatEndRef} />
           </CardContent>
           <div className='p-4 border-t shrink-0'>
-            {userAnswers.length >= AI_QUESTIONS.length ? (
+            {allQuestionsAnswered ? (
               <Button
                 className='w-full'
                 onClick={() => generateBriefFromAnswers(userAnswers)}

@@ -23,6 +23,13 @@ const BASE_URL =
   process.env.NEXT_PUBLIC_API_URL ||
   'https://videoforge-gateway.fly.dev/api/v1';
 
+export class TimeoutError extends Error {
+  constructor(message = 'Request timed out') {
+    super(message);
+    this.name = 'TimeoutError';
+  }
+}
+
 export async function fetchWithAuth(
   url: string,
   options: RequestInit = {}
@@ -37,21 +44,34 @@ export async function fetchWithAuth(
     headers.set('Content-Type', 'application/json');
   }
 
-  const response = await fetch(`${BASE_URL}${url}`, {
-    ...options,
-    headers,
-  });
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
 
-  if (!response.ok) {
-    const errorData = await response.json().catch(() => ({}));
-    throw new Error(errorData.message || `HTTP error ${response.status}`);
+  try {
+    const response = await fetch(`${BASE_URL}${url}`, {
+      ...options,
+      headers,
+      signal: controller.signal,
+    });
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}));
+      throw new Error(errorData.message || `HTTP error ${response.status}`);
+    }
+
+    if (response.status === 204) {
+      return;
+    }
+
+    return response.json();
+  } catch (error) {
+    clearTimeout(timeoutId);
+    if (error instanceof Error && error.name === 'AbortError') {
+      throw new TimeoutError('Request timed out. Please check your connection and try again.');
+    }
+    throw error;
   }
-
-  if (response.status === 204) {
-    return;
-  }
-
-  return response.json();
 }
 
 function transformBriefResponse(b: any): Brief {
