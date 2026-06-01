@@ -7,7 +7,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
-import { isClient } from '@/stores/auth-store';
+import { isClient, hasHydrated, useAuthStore } from '@/stores/auth-store';
 import {
   Card,
   CardContent,
@@ -54,11 +54,28 @@ export default function NewBriefPage() {
 
   // Restrict brief creation to client role only
   useEffect(() => {
-    if (!isClient()) {
-      toast.error('Only clients can create briefs');
-      router.push('/dashboard/briefs');
+    if (hasHydrated()) {
+      // Already hydrated, check immediately
+      if (!isClient()) {
+        toast.error('Only clients can create briefs');
+        router.push('/dashboard/briefs');
+      } else {
+        setAccessChecked(true);
+      }
     } else {
-      setAccessChecked(true);
+      // Wait for hydration
+      const unsubscribe = useAuthStore.subscribe((state) => {
+        if (state._hasHydrated) {
+          if (!isClient()) {
+            toast.error('Only clients can create briefs');
+            router.push('/dashboard/briefs');
+          } else {
+            setAccessChecked(true);
+          }
+          unsubscribe();
+        }
+      });
+      return () => unsubscribe();
     }
   }, [router]);
   const [formData, setFormData] = useState<FormData>({
