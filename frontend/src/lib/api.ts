@@ -30,13 +30,11 @@ export class TimeoutError extends Error {
   }
 }
 
-export async function fetchWithAuth(
-  url: string,
-  options: RequestInit = {}
-) {
+async function fetchWithAuth(url: string, options: RequestInit & { timeout?: number } = {}) {
+  const { timeout = 10000, ...fetchOptions } = options;
   const token =
     typeof window !== 'undefined' ? localStorage.getItem('token') : null;
-  const headers = new Headers(options.headers);
+  const headers = new Headers(fetchOptions.headers);
   if (token) {
     headers.set('Authorization', `Bearer ${token}`);
   }
@@ -45,11 +43,11 @@ export async function fetchWithAuth(
   }
 
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), 10000); // 10s timeout
+  const timeoutId = setTimeout(() => controller.abort(), timeout);
 
   try {
     const response = await fetch(`${BASE_URL}${url}`, {
-      ...options,
+      ...fetchOptions,
       headers,
       signal: controller.signal,
     });
@@ -68,7 +66,7 @@ export async function fetchWithAuth(
   } catch (error) {
     clearTimeout(timeoutId);
     if (error instanceof Error && error.name === 'AbortError') {
-      throw new TimeoutError('Request timed out. Please check your connection and try again.');
+      throw new TimeoutError(`Request timed out after ${timeout}ms. Please check your connection and try again.`);
     }
     throw error;
   }
@@ -97,6 +95,7 @@ export const api = {
     const data = await fetchWithAuth('/auth/login', {
       method: 'POST',
       body: JSON.stringify({ email, password }),
+      timeout: 60000, // 60 seconds for login (NeonDB cold-start)
     });
     localStorage.setItem('token', data.token);
     return data.user;

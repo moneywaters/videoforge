@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { Icons } from '@/components/icons';
@@ -19,6 +19,25 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [isLoading, setIsLoading] = useState(false);
+  const [loadingDuration, setLoadingDuration] = useState(0);
+
+  // Update loading message based on duration
+  useEffect(() => {
+    if (!isLoading) {
+      setLoadingDuration(0);
+      return;
+    }
+    const interval = setInterval(() => {
+      setLoadingDuration((d) => d + 1000);
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [isLoading]);
+
+  const getLoadingText = () => {
+    if (loadingDuration < 5000) return 'Loading...';
+    if (loadingDuration < 10000) return 'Connecting to database...';
+    return 'Warming up database (this may take 30s)...';
+  };
 
   const handleGoogleLogin = () => {
     loginWithGoogle();
@@ -79,7 +98,7 @@ export default function LoginPage() {
               />
             </div>
             <Button type='submit' className='w-full' disabled={isLoading} isLoading={isLoading}>
-              {isLoading ? 'Signing in...' : 'Sign In'}
+              {isLoading ? getLoadingText() : 'Sign In'}
             </Button>
             <div className='relative py-2'>
               <div className='absolute inset-0 flex items-center'>
