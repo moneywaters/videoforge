@@ -7,6 +7,7 @@ import { toast } from 'sonner';
 import { api } from '@/lib/api';
 import { Icons } from '@/components/icons';
 import { Button } from '@/components/ui/button';
+import { isClient } from '@/stores/auth-store';
 import {
   Card,
   CardContent,
@@ -49,6 +50,17 @@ type FormData = {
 export default function NewBriefPage() {
   const router = useRouter();
   const [step, setStep] = useState<'form' | 'interview'>('form');
+  const [accessChecked, setAccessChecked] = useState(false);
+
+  // Restrict brief creation to client role only
+  useEffect(() => {
+    if (!isClient()) {
+      toast.error('Only clients can create briefs');
+      router.push('/dashboard/briefs');
+    } else {
+      setAccessChecked(true);
+    }
+  }, [router]);
   const [formData, setFormData] = useState<FormData>({
     title: '',
     description: '',
@@ -168,6 +180,14 @@ Format Preference: ${lengthPref}`;
       handleSendMessage();
     }
   };
+
+  if (!accessChecked) {
+    return (
+      <div className='flex items-center justify-center min-h-[400px]'>
+        <Icons.spinner className='h-8 w-8 animate-spin text-muted-foreground' />
+      </div>
+    );
+  }
 
   if (step === 'interview') {
     const showGenerateButton =

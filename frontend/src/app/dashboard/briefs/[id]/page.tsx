@@ -144,11 +144,7 @@ export default function BriefDetailPage() {
           },
         });
 
-await api.confirmUpload(id, storjKey, {
-          name: file.name,
-          type: file.type,
-          size: file.size,
-        });
+await api.confirmUpload(id, storjKey);
 
         // Fetch the presigned download URL for preview
         let fileUrl: string | undefined;
