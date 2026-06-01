@@ -48,6 +48,13 @@ jobs:
           cp svc-${{ matrix.service.name }}/fly.toml ./fly-${{ matrix.service.name }}.toml
           sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-${{ matrix.service.name }}.toml
 
+      - name: Create Fly.io app if it doesn't exist
+        continue-on-error: true
+        run: |
+          flyctl apps create ${{ matrix.service.app }} --org moneywaters 2>/dev/null || echo "App may already exist"
+        env:
+          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
+
       - name: Deploy to Fly.io
         run: flyctl deploy --config ./fly-${{ matrix.service.name }}.toml --app ${{ matrix.service.app }} --yes
         env:
