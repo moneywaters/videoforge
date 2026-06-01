@@ -11,7 +11,6 @@ RUN apk add --no-cache git ca-certificates
 
 # Copy Go workspace files to root
 COPY go.work go.work
-COPY go.work.sum go.work.sum 2>/dev/null || true
 
 # Copy pkg module
 COPY pkg/ ./pkg/
