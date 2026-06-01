@@ -15,18 +15,23 @@ export default function GoogleCallbackPage() {
   const { handleGoogleCallback } = useAuthStore();
 
   useEffect(() => {
+    console.log('[OAuthCallback] useEffect running');
     // Read token from URL query parameter
     const token = searchParams.get('token');
+    console.log('[OAuthCallback] Token from URL:', token ? `exists (length: ${token.length})` : 'null');
 
     if (!token) {
+      console.error('[OAuthCallback] No token in URL');
       setError('No token provided. Please try logging in again.');
       return;
     }
 
     // Use the handleGoogleCallback from auth store which handles token decoding and user setting
+    console.log('[OAuthCallback] Calling handleGoogleCallback...');
     handleGoogleCallback(token);
 
     // Navigate to dashboard after handling the callback
+    console.log('[OAuthCallback] Navigating to /dashboard');
     router.push('/dashboard');
   }, [searchParams, router, setLoading, setUser, handleGoogleCallback]);
 

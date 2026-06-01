@@ -54,10 +54,12 @@ export const useAuthStore = create<AuthState>()(
         window.location.href = targetUrl;
       },
       handleGoogleCallback: (token: string) => {
+        console.log('[OAuth] handleGoogleCallback called, token length:', token?.length);
         if (typeof window === 'undefined') return;
         const payload = decodeJWT(token);
+        console.log('[OAuth] JWT payload:', payload);
         if (!payload.sub) {
-          console.error('Invalid token: missing sub claim');
+          console.error('[OAuth] Invalid token: missing sub claim');
           return;
         }
         const user: User = {
@@ -69,8 +71,13 @@ export const useAuthStore = create<AuthState>()(
           createdAt: new Date().toISOString(),
           onboardingComplete: false,
         };
+        console.log('[OAuth] Creating user object:', user);
         getLocalStorage()?.setItem('token', token);
         set({ user, isLoading: false });
+        setTimeout(() => {
+          console.log('[OAuth] Store state after set:', useAuthStore.getState().user);
+          console.log('[OAuth] localStorage auth-storage:', localStorage.getItem('auth-storage'));
+        }, 500);
       },
       logout: () => {
         getLocalStorage()?.removeItem('token');
@@ -83,7 +90,6 @@ export const useAuthStore = create<AuthState>()(
     {
       name: 'auth-storage',
       partialize: (state) => ({ user: state.user }),
-      skipHydration: true,
       storage: createJSONStorage(() => {
         if (typeof window === 'undefined') {
           return {
@@ -95,7 +101,9 @@ export const useAuthStore = create<AuthState>()(
         return localStorage;
       }),
       onRehydrateStorage: () => (state) => {
-        state?.setHasHydrated(true);
+        if (state) {
+          state._hasHydrated = true;
+        }
       },
     }
   )
