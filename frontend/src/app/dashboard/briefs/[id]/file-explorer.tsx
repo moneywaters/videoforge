@@ -159,7 +159,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
       {/* Files + Info Split */}
       <div className="flex gap-0 border rounded-lg overflow-hidden bg-background min-h-[200px]">
         {/* File List */}
-        <div className="flex-1 min-w-0 p-3">
+        <div className="flex-1 min-w-0 p-3 shrink-0">
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
               <IconFolder className="w-12 h-12 opacity-20 mb-3" />
@@ -283,7 +283,7 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
               <div className="flex items-center gap-2 mb-2">
                 {(() => {
                   const Icon = getFileIcon(selected.type);
-                  return <Icon className="w-8 h-8 text-muted-foreground" />;
+                  return <Icon className="w-8 h-8 text-muted-foreground shrink-0" />;
                 })()}
                 <div className="min-w-0">
                   <p className="text-sm font-medium truncate" title={selected.name}>

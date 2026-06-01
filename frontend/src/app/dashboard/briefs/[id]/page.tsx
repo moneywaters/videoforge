@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { api } from '@/lib/api';
@@ -13,6 +13,7 @@ import { UploadList } from '@/components/upload/UploadList';
 import type { UploadFile } from '@/components/upload/UploadItem';
 import { BriefFileExplorer, type BriefFile } from './file-explorer';
 import { VideoPreviewModal } from './video-preview-modal';
+import { loadBriefFiles, saveBriefFiles, type StoredBriefFile } from '@/lib/brief-files-storage';
 import type { BriefStatus, Video } from '@/types/index';
 
 const statusBadgeVariant = (status: BriefStatus): 'default' | 'secondary' | 'destructive' | 'outline' => {
@@ -77,11 +78,15 @@ export default function BriefDetailPage() {
   const uploadControllersRef = useRef<Map<string, UploadController>>(new Map());
 
   const [uploads, setUploads] = useState<UploadFile[]>([]);
-  const [briefFiles, setBriefFiles] = useState<BriefFile[]>([]);
+  const [briefFiles, setBriefFiles] = useState<BriefFile[]>(() => loadBriefFiles(id));
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>('');
 
   const isUploading = uploads.some((u) => u.status === 'uploading');
+
+  useEffect(() => {
+    saveBriefFiles(id, briefFiles);
+  }, [id, briefFiles]);
 
   const { data: brief, isLoading: briefLoading } = useQuery({
     queryKey: ['brief', id],
@@ -175,6 +180,7 @@ await api.confirmUpload(id, storjKey);
             size: file.size,
             uploadedAt: new Date().toISOString(),
             thumbnailUrl: thumbnailUrl ?? undefined,
+            url: fileUrl,
           },
         ]);
       } catch (error) {
