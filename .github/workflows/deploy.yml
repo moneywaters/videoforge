@@ -17,22 +17,6 @@ jobs:
             app: videoforge-gateway
           - name: brief
             app: videoforge-brief
-          - name: video
-            app: videoforge-video
-          - name: campaign
-            app: videoforge-campaign
-          - name: shopify
-            app: videoforge-shopify
-          - name: performance
-            app: videoforge-performance
-          - name: notification
-            app: videoforge-notification
-          - name: payout
-            app: videoforge-payout
-          - name: admin
-            app: videoforge-admin
-          - name: ai-support
-            app: videoforge-ai-support
     concurrency:
       group: deploy-${{ matrix.service.app }}
       cancel-in-progress: false
@@ -47,19 +31,6 @@ jobs:
         run: |
           cp svc-${{ matrix.service.name }}/fly.toml ./fly-${{ matrix.service.name }}.toml
           sed -i 's|dockerfile = "../Dockerfile"|dockerfile = "Dockerfile"|' ./fly-${{ matrix.service.name }}.toml
-
-      - name: Create Fly.io app if it doesn't exist
-        continue-on-error: true
-        run: |
-          set +e
-          flyctl apps create ${{ matrix.service.app }} --org personal
-          EXIT_CODE=$?
-          if [ $EXIT_CODE -ne 0 ]; then
-            echo "Warning: flyctl apps create exited with code $EXIT_CODE"
-            echo "Continuing anyway - app may already exist"
-          fi
-        env:
-          FLY_API_TOKEN: ${{ secrets.FLY_API_TOKEN }}
 
       - name: Deploy to Fly.io
         run: flyctl deploy --config ./fly-${{ matrix.service.name }}.toml --app ${{ matrix.service.app }} --yes
