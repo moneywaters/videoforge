@@ -88,6 +88,7 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
   const [imageError, setImageError] = useState(false);
+  const [videoError, setVideoError] = useState(false);
 
   const sorted = useMemo(() => {
     const list = [...files];
@@ -117,21 +118,47 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
     setIsZipping(true);
     try {
       const zip = new JSZip();
+      const added: string[] = [];
+      const failed: string[] = [];
+
       for (const file of files) {
-        if (!file.url || !file.url.startsWith('blob:')) continue;
+        if (!file.url) {
+          failed.push(file.name);
+          continue;
+        }
         try {
           const response = await fetch(file.url);
+          if (!response.ok) {
+            throw new Error(`HTTP ${response.status}`);
+          }
           const blob = await response.blob();
+          if (blob.size === 0) {
+            throw new Error('empty blob');
+          }
           zip.file(file.name, blob);
-        } catch {
-          console.warn(`Failed to add ${file.name} to ZIP`);
+          added.push(file.name);
+        } catch (err) {
+          console.warn(`Failed to add ${file.name} to ZIP:`, err);
+          failed.push(file.name);
         }
       }
-      const content = await zip.generateAsync({ type: 'blob' });
-      const filename = briefId ? `${briefId}-files.zip` : 'files.zip';
-      saveAs(content, filename);
+
+      if (added.length === 0) {
+        alert('Could not download files — blob URLs have expired. Please re-upload the files to this brief.');
+        return;
+      }
+
+      const blob = await zip.generateAsync({ type: 'blob' });
+      const filename = briefId ? `${briefId}-files.zip` : 'brief-files.zip';
+      saveAs(blob, filename);
+
+      if (failed.length > 0) {
+        console.warn(`ZIP: added ${added.length}, skipped ${failed.length}:`, failed);
+        alert(`Added ${added.length} files, skipped ${failed.length} failed (re-upload those files to include them)`);
+      }
     } catch (err) {
       console.error('Failed to create ZIP:', err);
+      alert('Failed to create ZIP file.');
     } finally {
       setIsZipping(false);
     }
@@ -406,6 +433,28 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
                   <IconAlertCircle className="w-8 h-8 mb-2" />
                   <p className="text-xs text-center">Preview unavailable</p>
                 </div>
+              )}
+
+              {/* Video Preview */}
+              {selected.type.startsWith('video/') && selected.url && !videoError && (
+                <div className="rounded-md overflow-hidden border bg-black">
+                  <video
+                    src={selected.url}
+                    controls
+                    className="w-full max-h-[300px]"
+                    onError={() => setVideoError(true)}
+                  />
+                </div>
+              )}
+              {selected.type.startsWith('video/') && videoError && (
+                <button
+                  type="button"
+                  className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground w-full cursor-pointer hover:bg-muted/50 transition-colors"
+                  onClick={() => selected.url && window.open(selected.url, '_blank', 'noopener,noreferrer')}
+                >
+                  <IconVideo className="w-8 h-8 mb-2" />
+                  <p className="text-xs text-center">Video preview unavailable (click to download)</p>
+                </button>
               )}
 
               {/* Text Preview */}
