@@ -19,8 +19,13 @@ import {
   IconFileText,
   IconAlertCircle,
 } from '@tabler/icons-react';
-import JSZip from 'jszip';
-import { saveAs } from 'file-saver';
+import streamSaver from 'streamsaver';
+// Configure stream-saver to use local Service Worker files from public/
+streamSaver.mitm = '/streamsaver-mitm.html';
+if ('serviceWorker' in navigator && 'WritableStream' in window) {
+  streamSaver.url = '/streamsaver-sw.js';
+}
+import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -84,6 +89,12 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
   const [infoWidth, setInfoWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
   const [isZipping, setIsZipping] = useState(false);
+  const [zipProgress, setZipProgress] = useState<{
+    current: number;
+    total: number;
+    bytesWritten: number;
+    currentFile: string;
+  } | null>(null);
   const [textContent, setTextContent] = useState<string | null>(null);
   const [textLoading, setTextLoading] = useState(false);
   const [textError, setTextError] = useState<string | null>(null);
@@ -115,52 +126,111 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
 
   const handleDownloadAll = async () => {
     if (files.length === 0) return;
+
     setIsZipping(true);
-    try {
-      const zip = new JSZip();
-      const added: string[] = [];
-      const failed: string[] = [];
+    setZipProgress({ current: 0, total: files.length, bytesWritten: 0, currentFile: 'Preparing...' });
 
-      for (const file of files) {
-        if (!file.url) {
-          failed.push(file.name);
-          continue;
-        }
-        try {
-          const response = await fetch(file.url);
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}`);
-          }
-          const blob = await response.blob();
-          if (blob.size === 0) {
-            throw new Error('empty blob');
-          }
-          zip.file(file.name, blob);
-          added.push(file.name);
-        } catch (err) {
-          console.warn(`Failed to add ${file.name} to ZIP:`, err);
-          failed.push(file.name);
-        }
-      }
+    // Create streaming download — this immediately prompts the browser download
+    const fileName = briefId ? `${briefId}-files.zip` : 'brief-files.zip';
+    const fileStream = streamSaver.createWriteStream(fileName, { size: 0 });
+    const writer = fileStream.getWriter();
 
-      if (added.length === 0) {
-        alert('Could not download files — blob URLs have expired. Please re-upload the files to this brief.');
+    // Streaming ZIP — pumps output chunks to the writer
+    const zip = new Zip((err, data, final) => {
+      if (err) {
+        console.error('ZIP compression error:', err);
+        writer.abort(err);
         return;
       }
+      writer.write(new Uint8Array(data)).catch(() => {});
+      if (final) writer.close();
+    });
 
-      const blob = await zip.generateAsync({ type: 'blob' });
-      const filename = briefId ? `${briefId}-files.zip` : 'brief-files.zip';
-      saveAs(blob, filename);
+    const failed: string[] = [];
+    let added = 0;
+    let totalBytes = 0;
 
-      if (failed.length > 0) {
-        console.warn(`ZIP: added ${added.length}, skipped ${failed.length}:`, failed);
-        alert(`Added ${added.length} files, skipped ${failed.length} failed (re-upload those files to include them)`);
+    try {
+      for (const file of files) {
+        setZipProgress((p) => p && { ...p, currentFile: file.name });
+
+        if (!file.url) {
+          failed.push(file.name);
+          setZipProgress((p) => p && { ...p, current: p.current + 1 });
+          continue;
+        }
+
+        try {
+          const resp = await fetch(file.url);
+          if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+          const blob = await resp.blob();
+          if (blob.size === 0) throw new Error('empty blob');
+
+          // Choose PassThrough for already-compressed media, Deflate for text
+          const ext = file.name.split('.').pop()?.toLowerCase() ?? '';
+          const compressedExts = [
+            'mp4', 'mov', 'webm', 'mkv', 'avi', 'mp3', 'wav',
+            'jpg', 'jpeg', 'png', 'gif', 'webp', 'avif',
+            'zip', 'rar', '7z', 'gz', 'bz2',
+          ];
+          const shouldCompress = !compressedExts.includes(ext);
+
+          const entry = shouldCompress
+            ? new ZipDeflate(file.name, { level: 6 })
+            : new ZipPassThrough(file.name);
+
+          zip.add(entry);
+
+          // Stream the blob through the entry in chunks (64KB)
+          const CHUNK = 65536;
+          let offset = 0;
+          while (offset < blob.size) {
+            const slice = blob.slice(offset, offset + CHUNK);
+            const buf = await slice.arrayBuffer();
+            offset += CHUNK;
+            const isFinal = offset >= blob.size;
+            entry.push(new Uint8Array(buf), isFinal);
+            totalBytes += buf.byteLength;
+            setZipProgress({
+              current: added + failed.length + 1,
+              total: files.length,
+              bytesWritten: totalBytes,
+              currentFile: file.name,
+            });
+          }
+
+          added++;
+        } catch (err) {
+          console.warn(`Failed to stream ${file.name}:`, err);
+          failed.push(file.name);
+        } finally {
+          setZipProgress((p) =>
+            p
+              ? {
+                  ...p,
+                  current: added + failed.length,
+                  total: files.length,
+                }
+              : p
+          );
+        }
       }
+
+      zip.end();
     } catch (err) {
-      console.error('Failed to create ZIP:', err);
-      alert('Failed to create ZIP file.');
+      console.error('ZIP stream failed:', err);
+      try {
+        writer.abort(err);
+      } catch {
+        // ignore
+      }
+      alert('Download failed: ' + (err instanceof Error ? err.message : 'unknown error'));
     } finally {
+      setZipProgress(null);
       setIsZipping(false);
+      if (failed.length > 0) {
+        alert(`Downloaded ${added} of ${files.length} files. Skipped: ${failed.join(', ')}`);
+      }
     }
   };
 
@@ -259,8 +329,12 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
           disabled={files.length === 0 || isZipping}
           className="ml-auto"
         >
-          {isZipping ? (
-            <>Creating ZIP...</>
+          {isZipping && zipProgress ? (
+            <div className="flex items-center gap-2">
+              <span className="text-xs">
+                {zipProgress.current}/{zipProgress.total}
+              </span>
+            </div>
           ) : (
             <>
               <IconDownload className="w-4 h-4 mr-1.5" />
@@ -268,6 +342,23 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
             </>
           )}
         </Button>
+        {isZipping && zipProgress && (
+          <div className="absolute top-full right-0 mt-1 bg-background border rounded-md shadow-lg p-2 text-xs space-y-1 z-50 min-w-[160px]">
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Files:</span>
+              <span>
+                {zipProgress.current} / {zipProgress.total}
+              </span>
+            </div>
+            <div className="flex justify-between gap-2">
+              <span className="text-muted-foreground">Size:</span>
+              <span>{(zipProgress.bytesWritten / 1024 / 1024).toFixed(1)} MB</span>
+            </div>
+            <div className="truncate max-w-[140px]">
+              <span className="text-muted-foreground">Current:</span> {zipProgress.currentFile}
+            </div>
+          </div>
+        )}
       </div>
 
       {/* Files + Info Split */}
