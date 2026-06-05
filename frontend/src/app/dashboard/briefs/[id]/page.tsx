@@ -78,14 +78,28 @@ export default function BriefDetailPage() {
   const uploadControllersRef = useRef<Map<string, UploadController>>(new Map());
 
   const [uploads, setUploads] = useState<UploadFile[]>([]);
-  const [briefFiles, setBriefFiles] = useState<BriefFile[]>(() => loadBriefFiles(id));
+  const [briefFiles, setBriefFiles] = useState<BriefFile[]>([]);
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>('');
 
   const isUploading = uploads.some((u) => u.status === 'uploading');
 
+  // Load persisted files after hydration (client-side only)
+  const filesLoadedRef = useRef(false);
   useEffect(() => {
-    saveBriefFiles(id, briefFiles);
+    const stored = loadBriefFiles(id);
+    filesLoadedRef.current = true;
+    if (stored.length > 0) {
+      setBriefFiles(stored);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id]);
+
+  // Save to localStorage when files change (but only after initial load)
+  useEffect(() => {
+    if (filesLoadedRef.current) {
+      saveBriefFiles(id, briefFiles);
+    }
   }, [id, briefFiles]);
 
   const { data: brief, isLoading: briefLoading } = useQuery({
@@ -151,7 +165,11 @@ export default function BriefDetailPage() {
 
 await api.confirmUpload(id, storjKey);
 
-        // Fetch the presigned download URL for preview
+        // Create a session-scoped blob URL for playback (never expires during session).
+        // This is the URL used for video playback on double-click.
+        const blobUrl = URL.createObjectURL(file);
+
+        // Also fetch presigned download URL for backend reference (optional)
         let fileUrl: string | undefined;
         try {
           const resp = await api.getDownloadUrl(id);
@@ -180,7 +198,7 @@ await api.confirmUpload(id, storjKey);
             size: file.size,
             uploadedAt: new Date().toISOString(),
             thumbnailUrl: thumbnailUrl ?? undefined,
-            url: fileUrl,
+            url: blobUrl,
           },
         ]);
       } catch (error) {

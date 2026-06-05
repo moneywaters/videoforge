@@ -157,9 +157,9 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
       </div>
 
       {/* Files + Info Split */}
-      <div className="flex gap-0 border rounded-lg overflow-hidden bg-background min-h-[200px]">
-        {/* File List */}
-        <div className="flex-1 min-w-0 p-3 shrink-0">
+      <div className="relative border rounded-lg overflow-hidden bg-background min-h-[200px]">
+        {/* File List — full width, info pane overlays on top */}
+        <div className="p-3">
           {sorted.length === 0 ? (
             <div className="flex flex-col items-center justify-center h-full text-muted-foreground py-12">
               <IconFolder className="w-12 h-12 opacity-20 mb-3" />
@@ -249,12 +249,20 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
           )}
         </div>
 
-        {/* Resizable Info Panel */}
+        {/* Info Panel — absolute overlay, does NOT push file list */}
         {selected && (
           <>
+            {/* Click-away backdrop */}
+            <div
+              className="absolute inset-0 bg-transparent"
+              onClick={() => setSelectedId(null)}
+              aria-hidden="true"
+            />
+
             {/* Drag Handle */}
             <div
-              className="w-0.5 bg-border cursor-col-resize hover:bg-primary/50 transition-colors relative group"
+              className="absolute top-0 bottom-0 w-1 bg-border cursor-col-resize hover:bg-primary/50 transition-colors z-20"
+              style={{ right: infoWidth }}
               onMouseDown={(e) => {
                 const startX = e.clientX;
                 const startW = infoWidth;
@@ -272,20 +280,20 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                 document.addEventListener('mouseup', handleMouseUp);
               }}
             >
-              <div className="absolute inset-y-0 -left-1 w-2 cursor-col-resize" />
+              <div className="absolute inset-y-0 -left-1 -right-1 cursor-col-resize" />
             </div>
 
             {/* Info Content */}
             <div
-              className="p-4 bg-muted/30 border-l space-y-4 select-none"
-              style={{ width: infoWidth, minWidth: infoWidth }}
+              className="absolute top-0 right-0 bottom-0 p-4 bg-background/95 backdrop-blur-sm border-l space-y-4 select-none overflow-y-auto z-30 shadow-lg"
+              style={{ width: infoWidth }}
             >
               <div className="flex items-center gap-2 mb-2">
                 {(() => {
                   const Icon = getFileIcon(selected.type);
                   return <Icon className="w-8 h-8 text-muted-foreground shrink-0" />;
                 })()}
-                <div className="min-w-0">
+                <div className="flex-1 min-w-0">
                   <p className="text-sm font-medium truncate" title={selected.name}>
                     {selected.name}
                   </p>
@@ -309,8 +317,6 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                   <span className="font-mono text-xs">{selected.id.slice(0, 8)}</span>
                 </div>
               </div>
-
-              
 
               {onDownload && selected.url && (
                 <Button
