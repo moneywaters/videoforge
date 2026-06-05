@@ -114,7 +114,7 @@ export default function BriefDetailPage() {
     enabled: !!id,
   });
 
-  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     if (!id) return;
@@ -126,18 +126,22 @@ export default function BriefDetailPage() {
       status: 'pending',
     }));
 
+    // Append new files to the existing queue (don't start immediately if uploads in progress)
     setUploads((prev) => [...prev, ...newUploads]);
 
-    let anyCompleted = false;
-    const errors: string[] = [];
-
+    // Process each new upload one by one
     for (const uploadItem of newUploads) {
       const uploadId = uploadItem.id;
       const file = uploadItem.file;
 
+      // Check if already cancelled/removed before starting
+      const existing = uploads.find((u) => u.id === uploadId);
+      if (!existing) continue;
+
       const abortController = new AbortController();
       uploadControllersRef.current.set(uploadId, { abortController });
 
+      // Mark as uploading
       setUploads((prev) =>
         prev.map((u) =>
           u.id === uploadId ? { ...u, status: 'uploading' } : u
@@ -163,7 +167,7 @@ export default function BriefDetailPage() {
           },
         });
 
-await api.confirmUpload(id, storjKey);
+        await api.confirmUpload(id, storjKey);
 
         // Create a session-scoped blob URL for playback (never expires during session).
         // This is the URL used for video playback on double-click.
@@ -178,7 +182,7 @@ await api.confirmUpload(id, storjKey);
           // ignore, fileUrl stays undefined
         }
 
-        anyCompleted = true;
+        // Update status to completed
         setUploads((prev) =>
           prev.map((u) =>
             u.id === uploadId ? { ...u, status: 'completed', progress: 100 } : u
@@ -201,36 +205,38 @@ await api.confirmUpload(id, storjKey);
             url: blobUrl,
           },
         ]);
+
+        queryClient.invalidateQueries({ queryKey: ['videos', 'brief', id] });
       } catch (error) {
-        const isCancelled =
-          error instanceof Error && error.message === 'Upload cancelled';
+        // Check for AbortError - don't show error toast for aborted uploads
+        const isAbortError = error instanceof Error && (
+          error.name === 'AbortError' ||
+          error.message === 'The operation was aborted.' ||
+          error.message === 'Upload cancelled'
+        );
         setUploads((prev) =>
           prev.map((u) =>
             u.id === uploadId
               ? {
                   ...u,
-                  status: isCancelled ? 'cancelled' : 'error',
-                  error: isCancelled ? undefined : error instanceof Error ? error.message : 'Upload failed',
+                  status: isAbortError ? 'cancelled' : 'error',
+                  error: isAbortError ? undefined : error instanceof Error ? error.message : 'Upload failed',
                 }
               : u
           )
         );
-        if (!isCancelled) {
-          errors.push(error instanceof Error ? error.message : 'Unknown error');
+        if (!isAbortError && error instanceof Error) {
+          alert(`Upload failed: ${error.message}`);
         }
       } finally {
         uploadControllersRef.current.delete(uploadId);
       }
     }
 
-    if (anyCompleted) {
-      queryClient.invalidateQueries({ queryKey: ['videos', 'brief', id] });
-      alert('Upload successful!');
-    }
-
-    if (errors.length > 0) {
-      alert(`Some uploads failed:\n${errors.join('\n')}`);
-    }
+    // Clear completed uploads from queue after a delay
+    setTimeout(() => {
+      setUploads((prev) => prev.filter((u) => u.status !== 'completed'));
+    }, 3000);
   };
 
   const handleDownload = async () => {
@@ -245,17 +251,24 @@ await api.confirmUpload(id, storjKey);
   };
 
   const handleCancel = (uploadId: string) => {
-    const controller = uploadControllersRef.current.get(uploadId);
-    if (controller) {
-      controller.abortController.abort();
-      setUploads((prev) =>
-        prev.map((u) =>
-          u.id === uploadId ? { ...u, status: 'cancelled' } : u
-        )
-      );
-      setTimeout(() => {
-        setUploads((prev) => prev.filter((u) => u.id !== uploadId));
-      }, 500);
+    // Find the upload
+    const upload = uploads.find((u) => u.id === uploadId);
+    if (!upload) return;
+
+    if (upload.status === 'pending') {
+      // For pending files: just remove from queue (don't start upload)
+      setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+    } else if (upload.status === 'uploading') {
+      // For in-progress uploads: abort the fetch
+      const controller = uploadControllersRef.current.get(uploadId);
+      if (controller) {
+        controller.abortController.abort();
+      }
+      // Mark as cancelled and remove from queue
+      setUploads((prev) => prev.filter((u) => u.id !== uploadId));
+    } else {
+      // For error/cancelled: just remove
+      setUploads((prev) => prev.filter((u) => u.id !== uploadId));
     }
   };
 
@@ -331,11 +344,10 @@ await api.confirmUpload(id, storjKey);
               multiple
               className="hidden"
               onChange={handleFileChange}
-              disabled={isUploading}
             />
             <label htmlFor="upload-footage" className="cursor-pointer inline-block">
-              <div className={`px-4 py-2 rounded-md font-medium text-sm transition-colors ${isUploading ? 'bg-gray-100 text-gray-400 cursor-not-allowed' : 'bg-gray-100 text-gray-900 hover:bg-gray-200'}`}>
-                {isUploading ? 'Uploading…' : 'Upload Raw Footage'}
+              <div className="px-4 py-2 rounded-md font-medium text-sm transition-colors bg-gray-100 text-gray-900 hover:bg-gray-200">
+                Upload Raw Footage {uploads.length > 0 ? `(${uploads.length} queued)` : ''}
               </div>
             </label>
           </div>
@@ -352,6 +364,7 @@ await api.confirmUpload(id, storjKey);
 
         <BriefFileExplorer
           files={briefFiles}
+          briefId={id}
           onDownload={(file) => file.url && window.open(file.url, '_blank', 'noopener,noreferrer')}
           onPreview={(file) => {
             setPreviewTitle(file.name);

@@ -41,7 +41,8 @@ function getFileIcon(file: globalThis.File) {
 export function UploadItem({ upload, onCancel }: UploadItemProps) {
   const { id, file, progress, status, error } = upload;
   const FileDisplayIcon = getFileIcon(file);
-  const showCancel = status === 'uploading';
+  // Show X button for pending (waiting), uploading, error, or cancelled - but NOT completed
+  const showCancel = status !== 'completed';
 
   return (
     <div className="bg-white rounded-lg border border-gray-200 p-3 space-y-2">
@@ -57,34 +58,41 @@ export function UploadItem({ upload, onCancel }: UploadItemProps) {
           <button
             type="button"
             onClick={() => onCancel(id)}
-            aria-label="Cancel upload"
-            className="p-1 rounded hover:bg-gray-100 transition-colors flex-shrink-0"
+            aria-label={status === 'pending' ? 'Remove from queue' : 'Cancel upload'}
+            className="p-1 rounded hover:bg-red-100 transition-colors flex-shrink-0"
           >
-            <IconX className="w-3.5 h-3.5 text-gray-500" />
+            <IconX className="w-3.5 h-3.5 text-gray-500 hover:text-red-600" />
           </button>
         )}
       </div>
 
-      <div className="relative">
-        <div
-          role="progressbar"
-          aria-valuenow={progress}
-          aria-valuemin={0}
-          aria-valuemax={100}
-          aria-label={`Upload progress: ${progress}%`}
-          className="h-6 bg-gray-200 rounded-full overflow-hidden"
-        >
+      {/* Show progress bar only for uploading/completed, show waiting state for pending */}
+      {status === 'pending' ? (
+        <div className="h-6 bg-gray-100 rounded-full flex items-center justify-center">
+          <span className="text-xs text-gray-500">Waiting...</span>
+        </div>
+      ) : (
+        <div className="relative">
           <div
-            className="h-full bg-blue-500 rounded-full transition-all duration-200"
-            style={{ width: `${progress}%` }}
-          />
-          <div className="absolute inset-0 flex items-center justify-center">
-            <span className="text-xs font-medium text-white drop-shadow-sm z-10">
-              {progress}%
-            </span>
+            role="progressbar"
+            aria-valuenow={progress}
+            aria-valuemin={0}
+            aria-valuemax={100}
+            aria-label={`Upload progress: ${progress}%`}
+            className="h-6 bg-gray-200 rounded-full overflow-hidden"
+          >
+            <div
+              className="h-full bg-blue-500 rounded-full transition-all duration-200"
+              style={{ width: `${progress}%` }}
+            />
+            <div className="absolute inset-0 flex items-center justify-center">
+              <span className="text-xs font-medium text-white drop-shadow-sm z-10">
+                {progress}%
+              </span>
+            </div>
           </div>
         </div>
-      </div>
+      )}
 
       <div className="flex items-center justify-between">
         <span className={`text-xs ${statusColors[status]}`}>

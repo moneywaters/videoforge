@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   IconFolder,
   IconPhoto,
@@ -15,10 +15,26 @@ import {
   IconArrowsSort,
   IconCalendar,
   IconRuler,
+  IconDownload,
+  IconFileText,
+  IconAlertCircle,
 } from '@tabler/icons-react';
+import JSZip from 'jszip';
+import { saveAs } from 'file-saver';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+
+// Text file extensions that can be previewed inline
+const TEXT_EXTENSIONS = new Set([
+  'txt', 'md', 'json', 'yaml', 'yml', 'csv', 'tsv', 'log', 'xml', 'html',
+  'css', 'js', 'ts', 'jsx', 'tsx', 'py', 'sh', 'bash', 'env', 'gitignore', 'config',
+]);
+
+function isTextFile(filename: string): boolean {
+  const ext = filename.split('.').pop()?.toLowerCase() ?? '';
+  return TEXT_EXTENSIONS.has(ext);
+}
 
 export interface BriefFile {
   id: string;
@@ -32,6 +48,7 @@ export interface BriefFile {
 
 interface BriefFileExplorerProps {
   files: BriefFile[];
+  briefId?: string;
   onDownload?: (file: BriefFile) => void;
   onPreview?: (file: BriefFile) => void;
 }
@@ -58,7 +75,7 @@ function getFileIcon(type: string) {
   return IconFile;
 }
 
-export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExplorerProps) {
+export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: BriefFileExplorerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [iconSize, setIconSize] = useState(48);
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -66,6 +83,11 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [infoWidth, setInfoWidth] = useState(280);
   const [isResizing, setIsResizing] = useState(false);
+  const [isZipping, setIsZipping] = useState(false);
+  const [textContent, setTextContent] = useState<string | null>(null);
+  const [textLoading, setTextLoading] = useState(false);
+  const [textError, setTextError] = useState<string | null>(null);
+  const [imageError, setImageError] = useState(false);
 
   const sorted = useMemo(() => {
     const list = [...files];
@@ -89,6 +111,53 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
       setSortDir('asc');
     }
   };
+
+  const handleDownloadAll = async () => {
+    if (files.length === 0) return;
+    setIsZipping(true);
+    try {
+      const zip = new JSZip();
+      for (const file of files) {
+        if (!file.url || !file.url.startsWith('blob:')) continue;
+        try {
+          const response = await fetch(file.url);
+          const blob = await response.blob();
+          zip.file(file.name, blob);
+        } catch {
+          console.warn(`Failed to add ${file.name} to ZIP`);
+        }
+      }
+      const content = await zip.generateAsync({ type: 'blob' });
+      const filename = briefId ? `${briefId}-files.zip` : 'files.zip';
+      saveAs(content, filename);
+    } catch (err) {
+      console.error('Failed to create ZIP:', err);
+    } finally {
+      setIsZipping(false);
+    }
+  };
+
+  // Load text content when a text file is selected
+  useEffect(() => {
+    setTextContent(null);
+    setTextError(null);
+    if (!selected || !selected.url) return;
+    if (!isTextFile(selected.name)) return;
+    if (selected.size > 1024 * 1024) {
+      setTextError('File too large to preview inline, please download');
+      return;
+    }
+    setTextLoading(true);
+    fetch(selected.url)
+      .then((r) => r.text())
+      .then((text) => {
+        // Only show first 50KB
+        setTextContent(text.slice(0, 50 * 1024));
+        setTextError(text.length > 50 * 1024 ? 'File truncated at 50KB' : null);
+      })
+      .catch(() => setTextError('Failed to load file content'))
+      .finally(() => setTextLoading(false));
+  }, [selected]);
 
   const handleResizeStart = () => setIsResizing(true);
 
@@ -154,6 +223,24 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
             />
           </div>
         )}
+
+        {/* Download All Button */}
+        <Button
+          size="sm"
+          variant="outline"
+          onClick={handleDownloadAll}
+          disabled={files.length === 0 || isZipping}
+          className="ml-auto"
+        >
+          {isZipping ? (
+            <>Creating ZIP...</>
+          ) : (
+            <>
+              <IconDownload className="w-4 h-4 mr-1.5" />
+              Download All
+            </>
+          )}
+        </Button>
       </div>
 
       {/* Files + Info Split */}
@@ -302,6 +389,54 @@ export function BriefFileExplorer({ files, onDownload, onPreview }: BriefFileExp
                   </p>
                 </div>
               </div>
+
+              {/* Image Preview */}
+              {selected.type.startsWith('image/') && selected.url && !imageError && (
+                <div className="rounded-md overflow-hidden border bg-muted/30">
+                  <img
+                    src={selected.url}
+                    alt={selected.name}
+                    className="w-full h-auto max-h-[200px] object-contain"
+                    onError={() => setImageError(true)}
+                  />
+                </div>
+              )}
+              {selected.type.startsWith('image/') && imageError && (
+                <div className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground">
+                  <IconAlertCircle className="w-8 h-8 mb-2" />
+                  <p className="text-xs text-center">Preview unavailable</p>
+                </div>
+              )}
+
+              {/* Text Preview */}
+              {isTextFile(selected.name) && selected.url && (
+                <div className="space-y-2">
+                  <p className="text-xs text-muted-foreground flex items-center gap-1">
+                    <IconFileText className="w-3.5 h-3.5" />
+                    Preview
+                  </p>
+                  {textLoading ? (
+                    <div className="rounded-md bg-muted/30 p-4 text-center text-xs text-muted-foreground">
+                      Loading...
+                    </div>
+                  ) : textError ? (
+                    <div className="rounded-md bg-muted/30 p-3 text-xs text-muted-foreground">
+                      {textError}
+                    </div>
+                  ) : textContent ? (
+                    <pre className="rounded-md bg-gray-900 text-gray-100 p-3 text-xs overflow-y-auto max-h-[40vh] whitespace-pre-wrap">
+                      {textContent.split('\n').map((line, i) => (
+                        <div key={i} className="flex">
+                          <span className="w-8 text-gray-500 select-none text-right pr-2 shrink-0">
+                            {i + 1}
+                          </span>
+                          <span className="flex-1">{line || ' '}</span>
+                        </div>
+                      ))}
+                    </pre>
+                  ) : null}
+                </div>
+              )}
 
               <div className="space-y-2 text-sm">
                 <div className="flex justify-between">
