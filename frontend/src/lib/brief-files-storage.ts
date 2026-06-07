@@ -11,6 +11,21 @@ export interface StoredBriefFile {
   uploadedAt: string;
   url?: string;
   thumbnailUrl?: string;
+  source?: 'raw-footage' | 'local';
+  status?: 'valid' | 'expired' | 'detecting';
+}
+
+// BriefFile is the runtime type used by the UI
+export interface BriefFile {
+  id: string;
+  name: string;
+  type: string;
+  size: number;
+  uploadedAt: string;
+  url?: string;
+  thumbnailUrl?: string;
+  source?: 'raw-footage' | 'local';
+  status?: 'valid' | 'expired' | 'detecting';
 }
 
 export function loadBriefFiles(briefId: string): StoredBriefFile[] {

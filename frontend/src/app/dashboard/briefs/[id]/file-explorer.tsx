@@ -18,17 +18,24 @@ import {
   IconDownload,
   IconFileText,
   IconAlertCircle,
+  IconAlertTriangle,
+  IconRefresh,
+  IconX,
 } from '@tabler/icons-react';
+import { Icons } from '@/components/icons';
 import streamSaver from 'streamsaver';
 // Configure stream-saver to use local Service Worker files from public/
+// @ts-expect-error - streamSaver types are incomplete
 streamSaver.mitm = '/streamsaver-mitm.html';
 if ('serviceWorker' in navigator && 'WritableStream' in window) {
+  // @ts-expect-error - streamSaver types are incomplete
   streamSaver.url = '/streamsaver-sw.js';
 }
 import { Zip, ZipDeflate, ZipPassThrough } from 'fflate';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import type { BriefFile } from '@/lib/brief-files-storage';
 
 // Text file extensions that can be previewed inline
 const TEXT_EXTENSIONS = new Set([
@@ -41,21 +48,14 @@ function isTextFile(filename: string): boolean {
   return TEXT_EXTENSIONS.has(ext);
 }
 
-export interface BriefFile {
-  id: string;
-  name: string;
-  type: string;
-  size: number;
-  uploadedAt: string;
-  url?: string;
-  thumbnailUrl?: string;
-}
+// BriefFile is imported from @/lib/brief-files-storage
 
 interface BriefFileExplorerProps {
   files: BriefFile[];
   briefId?: string;
   onDownload?: (file: BriefFile) => void;
   onPreview?: (file: BriefFile) => void;
+  onReupload?: (file: BriefFile) => void;
 }
 
 type SortKey = 'name' | 'size' | 'date';
@@ -80,7 +80,7 @@ function getFileIcon(type: string) {
   return IconFile;
 }
 
-export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: BriefFileExplorerProps) {
+export function BriefFileExplorer({ files, briefId, onDownload, onPreview, onReupload }: BriefFileExplorerProps) {
   const [viewMode, setViewMode] = useState<ViewMode>('grid');
   const [iconSize, setIconSize] = useState(48);
   const [sortKey, setSortKey] = useState<SortKey>('date');
@@ -125,7 +125,22 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
   };
 
   const handleDownloadAll = async () => {
-    if (files.length === 0) return;
+    // Filter out expired and detecting files
+    const validFiles = files.filter(
+      (f) => !f.url || f.status === 'valid' || f.status === undefined
+    );
+    const expiredCount = files.filter(
+      (f) => f.url && (f.status === 'expired' || f.status === 'detecting')
+    ).length;
+
+    if (validFiles.length === 0) {
+      if (expiredCount > 0) {
+        alert('All files expired. Please re-upload.');
+      } else {
+        alert('No valid files to download.');
+      }
+      return;
+    }
 
     setIsZipping(true);
     setZipProgress({ current: 0, total: files.length, bytesWritten: 0, currentFile: 'Preparing...' });
@@ -152,6 +167,11 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
 
     try {
       for (const file of files) {
+        // Skip expired/detecting files - they can't be downloaded
+        if (file.url && (file.status === 'expired' || file.status === 'detecting')) {
+          continue;
+        }
+
         setZipProgress((p) => p && { ...p, currentFile: file.name });
 
         if (!file.url) {
@@ -228,7 +248,12 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
     } finally {
       setZipProgress(null);
       setIsZipping(false);
-      if (failed.length > 0) {
+      // Post-download alert with expired info
+      if (added > 0 && expiredCount > 0) {
+        alert(`Downloaded ${added} file(s). ${expiredCount} file(s) were expired — re-upload them to include.`);
+      } else if (added === 0 && expiredCount > 0) {
+        alert('All files expired. Please re-upload.');
+      } else if (failed.length > 0) {
         alert(`Downloaded ${added} of ${files.length} files. Skipped: ${failed.join(', ')}`);
       }
     }
@@ -377,27 +402,46 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
                 const Icon = getFileIcon(file.type);
                 const isActive = selectedId === file.id;
                 const isMedia = file.type.startsWith('image/') || file.type.startsWith('video/');
+                const isExpired = file.status === 'expired';
+                const isDetecting = file.status === 'detecting';
+                const showReupload = isExpired && file.source === 'local' && onReupload;
                 return (
                   <div
                     role="button"
                     tabIndex={0}
                     key={file.id}
-                    onClick={() => setSelectedId(isActive ? null : file.id)}
-                    onDoubleClick={() => (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
+                    onClick={() => {
+                      if (showReupload) {
+                        onReupload?.(file);
+                      } else {
+                        setSelectedId(isActive ? null : file.id);
+                      }
+                    }}
+                    onDoubleClick={() => !isExpired && !isDetecting && (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
                     onKeyDown={(e) => {
                       if (e.key === 'Enter' || e.key === ' ') {
                         e.preventDefault();
-                        setSelectedId(isActive ? null : file.id);
+                        if (showReupload) {
+                          onReupload?.(file);
+                        } else {
+                          setSelectedId(isActive ? null : file.id);
+                        }
                       }
                     }}
                     className={cn(
                       'flex flex-col items-center gap-2 p-3 rounded-lg border transition-all text-center cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
                       isActive
                         ? 'border-primary bg-primary/5 shadow-sm'
-                        : 'border-border hover:border-foreground/20 hover:bg-muted/50'
+                        : 'border-border hover:border-foreground/20 hover:bg-muted/50',
+                      isExpired && 'opacity-50 grayscale',
+                      isDetecting && 'animate-pulse opacity-70'
                     )}
                   >
-                    {isMedia && file.thumbnailUrl ? (
+                    {isDetecting ? (
+                      <Icons.spinner className="text-muted-foreground animate-spin" style={{ width: iconSize, height: iconSize }} />
+                    ) : isExpired ? (
+                      <IconAlertTriangle className="text-amber-500" style={{ width: iconSize, height: iconSize }} />
+                    ) : isMedia && file.thumbnailUrl ? (
                       <img
                         src={file.thumbnailUrl}
                         alt={file.name}
@@ -407,9 +451,26 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
                     ) : (
                       <Icon className="text-muted-foreground" style={{ width: iconSize, height: iconSize }} />
                     )}
-                    <span className="text-xs truncate w-full" title={file.name}>
-                      {file.name}
-                    </span>
+                    <div className="flex flex-col items-center gap-1 w-full">
+                      <span className={cn('text-xs truncate w-full', isExpired && 'line-through')} title={file.name}>
+                        {file.name}
+                      </span>
+                      {isExpired && (
+                        <span className="text-[10px] text-amber-600 font-medium">Expired</span>
+                      )}
+                      {showReupload && (
+                        <button
+                          type="button"
+                          className="text-[10px] text-blue-600 hover:text-blue-800 font-medium"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            onReupload?.(file);
+                          }}
+                        >
+                          Re-upload
+                        </button>
+                      )}
+                    </div>
                   </div>
                 );
               })}
@@ -419,28 +480,70 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
               {sorted.map((file) => {
                 const Icon = getFileIcon(file.type);
                 const isActive = selectedId === file.id;
+                const isExpired = file.status === 'expired';
+                const isDetecting = file.status === 'detecting';
+                const showReupload = isExpired && file.source === 'local' && onReupload;
                 return (
                   <div
                     role="button"
                     tabIndex={0}
                     key={file.id}
-                    onClick={() => setSelectedId(isActive ? null : file.id)}
-                    onDoubleClick={() => (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter' || e.key === ' ') {
-                        e.preventDefault();
+                    onClick={() => {
+                      if (showReupload) {
+                        onReupload?.(file);
+                      } else {
                         setSelectedId(isActive ? null : file.id);
                       }
                     }}
+                    onDoubleClick={() => !isExpired && !isDetecting && (file.type.startsWith('video/') || file.type.startsWith('image/')) && onPreview?.(file)}
+                    onKeyDown={(e) => {
+                      if (e.key === 'Enter' || e.key === ' ') {
+                        e.preventDefault();
+                        if (showReupload) {
+                          onReupload?.(file);
+                        } else {
+                          setSelectedId(isActive ? null : file.id);
+                        }
+                      }
+                    }}
                     className={cn(
-                      'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors cursor-pointer focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
-                      isActive ? 'bg-muted' : 'hover:bg-muted/50'
+                      'w-full flex items-center gap-3 px-3 py-2 rounded-md text-left transition-colors focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2',
+                      isActive ? 'bg-muted' : 'hover:bg-muted/50',
+                      isExpired && 'opacity-50',
+                      isDetecting && 'animate-pulse opacity-70'
                     )}
                   >
-                    <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
-                    <span className="text-sm truncate flex-1 min-w-0" title={file.name}>
+                    {isDetecting ? (
+                      <Icons.spinner className="w-5 h-5 text-muted-foreground flex-shrink-0 animate-spin" />
+                    ) : isExpired ? (
+                      <IconAlertTriangle className="w-5 h-5 text-amber-500 flex-shrink-0" />
+                    ) : (
+                      <Icon className="w-5 h-5 text-muted-foreground flex-shrink-0" />
+                    )}
+                    <span
+                      className={cn('text-sm truncate flex-1 min-w-0', isExpired && 'line-through')}
+                      title={file.name}
+                    >
                       {file.name}
                     </span>
+                    {isExpired && (
+                      <span className="text-[10px] text-amber-600 font-medium px-1.5 py-0.5 bg-amber-50 rounded">
+                        Expired
+                      </span>
+                    )}
+                    {showReupload && (
+                      <button
+                        type="button"
+                        className="p-1 text-blue-600 hover:text-blue-800"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          onReupload?.(file);
+                        }}
+                        title="Re-upload"
+                      >
+                        <IconRefresh className="w-4 h-4" />
+                      </button>
+                    )}
                     <span className="text-xs text-muted-foreground tabular-nums w-16 text-right">
                       {formatBytes(file.size)}
                     </span>
@@ -493,63 +596,94 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
               className="absolute top-0 right-0 bottom-0 p-4 bg-background/95 backdrop-blur-sm border-l space-y-4 select-none overflow-y-auto z-30 shadow-lg"
               style={{ width: infoWidth }}
             >
-              <div className="flex items-center gap-2 mb-2">
-                {(() => {
-                  const Icon = getFileIcon(selected.type);
-                  return <Icon className="w-8 h-8 text-muted-foreground shrink-0" />;
-                })()}
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm font-medium truncate" title={selected.name}>
-                    {selected.name}
-                  </p>
-                  <p className="text-xs text-muted-foreground">
-                    {selected.type || 'unknown type'}
-                  </p>
-                </div>
-              </div>
+              {/* Expired file info panel */}
+              {selected.status === 'expired' ? (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    <IconAlertTriangle className="w-8 h-8 text-amber-500 shrink-0" />
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate line-through" title={selected.name}>
+                        {selected.name}
+                      </p>
+                      <p className="text-xs text-amber-600 font-medium">Expired</p>
+                    </div>
+                  </div>
 
-              {/* Image Preview */}
-              {selected.type.startsWith('image/') && selected.url && !imageError && (
-                <div className="rounded-md overflow-hidden border bg-muted/30">
-                  <img
-                    src={selected.url}
-                    alt={selected.name}
-                    className="w-full h-auto max-h-[200px] object-contain"
-                    onError={() => setImageError(true)}
-                  />
-                </div>
-              )}
-              {selected.type.startsWith('image/') && imageError && (
-                <div className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground">
-                  <IconAlertCircle className="w-8 h-8 mb-2" />
-                  <p className="text-xs text-center">Preview unavailable</p>
-                </div>
+                  <div className="rounded-md border-2 border-dashed border-amber-200 bg-amber-50 p-6 flex flex-col items-center justify-center text-center">
+                    <IconAlertCircle className="w-8 h-8 text-amber-500 mb-2" />
+                    <p className="text-sm text-amber-800 mb-2">This file expired.</p>
+                    <p className="text-xs text-amber-700 mb-4">The URL is no longer valid — please re-upload.</p>
+                    {onReupload && selected.source === 'local' && (
+                      <Button
+                        size="sm"
+                        onClick={() => onReupload(selected)}
+                        className="bg-amber-600 hover:bg-amber-700"
+                      >
+                        <IconRefresh className="w-4 h-4 mr-1.5" />
+                        Re-upload
+                      </Button>
+                    )}
+                  </div>
+                </>
+              ) : (
+                <>
+                  <div className="flex items-center gap-2 mb-2">
+                    {(() => {
+                      const Icon = getFileIcon(selected.type);
+                      return <Icon className="w-8 h-8 text-muted-foreground shrink-0" />;
+                    })()}
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-medium truncate" title={selected.name}>
+                        {selected.name}
+                      </p>
+                      <p className="text-xs text-muted-foreground">
+                        {selected.type || 'unknown type'}
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Image Preview */}
+                  {selected.type.startsWith('image/') && selected.url && !imageError && (
+                    <div className="rounded-md overflow-hidden border bg-muted/30">
+                      <img
+                        src={selected.url}
+                        alt={selected.name}
+                        className="w-full h-auto max-h-[200px] object-contain"
+                        onError={() => setImageError(true)}
+                      />
+                    </div>
+                  )}
+                  {selected.type.startsWith('image/') && imageError && (
+                    <div className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground">
+                      <IconAlertCircle className="w-8 h-8 mb-2" />
+                      <p className="text-xs text-center">Preview unavailable</p>
+                    </div>
+                  )}
+
+                  {/* Video Preview */}
+                  {selected.type.startsWith('video/') && selected.url && !videoError && (
+                    <div className="rounded-md overflow-hidden border bg-black">
+                      <video
+                        src={selected.url}
+                        controls
+                        className="w-full max-h-[300px]"
+                        onError={() => setVideoError(true)}
+                      />
+                    </div>
+                  )}
+                  {selected.type.startsWith('video/') && videoError && (
+                    <button
+                      type="button"
+                      className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground w-full cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => selected.url && window.open(selected.url, '_blank', 'noopener,noreferrer')}
+                    >
+                      <IconVideo className="w-8 h-8 mb-2" />
+                      <p className="text-xs text-center">Video preview unavailable (click to download)</p>
+                    </button>
               )}
 
-              {/* Video Preview */}
-              {selected.type.startsWith('video/') && selected.url && !videoError && (
-                <div className="rounded-md overflow-hidden border bg-black">
-                  <video
-                    src={selected.url}
-                    controls
-                    className="w-full max-h-[300px]"
-                    onError={() => setVideoError(true)}
-                  />
-                </div>
-              )}
-              {selected.type.startsWith('video/') && videoError && (
-                <button
-                  type="button"
-                  className="rounded-md border bg-muted/30 p-8 flex flex-col items-center justify-center text-muted-foreground w-full cursor-pointer hover:bg-muted/50 transition-colors"
-                  onClick={() => selected.url && window.open(selected.url, '_blank', 'noopener,noreferrer')}
-                >
-                  <IconVideo className="w-8 h-8 mb-2" />
-                  <p className="text-xs text-center">Video preview unavailable (click to download)</p>
-                </button>
-              )}
-
-              {/* Text Preview */}
-              {isTextFile(selected.name) && selected.url && (
+              {/* Text Preview - only show for non-expired files */}
+              {(selected.status === undefined || selected.status === 'valid' || selected.status === 'detecting') && isTextFile(selected.name) && selected.url && (
                 <div className="space-y-2">
                   <p className="text-xs text-muted-foreground flex items-center gap-1">
                     <IconFileText className="w-3.5 h-3.5" />
@@ -578,22 +712,26 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
                 </div>
               )}
 
-              <div className="space-y-2 text-sm">
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Size</span>
-                  <span>{formatBytes(selected.size)}</span>
+              {/* File details - hide for expired */}
+              {(selected.status === undefined || selected.status === 'valid' || selected.status === 'detecting') && (
+                <div className="space-y-2 text-sm">
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Size</span>
+                    <span>{formatBytes(selected.size)}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">Uploaded</span>
+                    <span>{new Date(selected.uploadedAt).toLocaleString()}</span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-muted-foreground">ID</span>
+                    <span className="font-mono text-xs">{selected.id.slice(0, 8)}</span>
+                  </div>
                 </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">Uploaded</span>
-                  <span>{new Date(selected.uploadedAt).toLocaleString()}</span>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-muted-foreground">ID</span>
-                  <span className="font-mono text-xs">{selected.id.slice(0, 8)}</span>
-                </div>
-              </div>
+              )}
 
-              {onDownload && selected.url && (
+              {/* Download button - only for non-expired with URL */}
+              {onDownload && selected.url && (selected.status === undefined || selected.status === 'valid' || selected.status === 'detecting') && (
                 <Button
                   size="sm"
                   className="w-full mt-2"
@@ -601,6 +739,8 @@ export function BriefFileExplorer({ files, briefId, onDownload, onPreview }: Bri
                 >
                   Download
                 </Button>
+              )}
+                </>
               )}
             </div>
           </>

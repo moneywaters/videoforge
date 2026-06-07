@@ -28,6 +28,10 @@ export interface Brief {
   tags: string[];
   createdAt: string;
   deadline?: string;
+  has_raw_footage?: boolean;
+  raw_footage_filename?: string;
+  raw_footage_storj_key?: string;
+  updated_at?: string;
 }
 
 export type VideoStatus =

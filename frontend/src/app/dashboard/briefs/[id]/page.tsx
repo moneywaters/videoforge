@@ -11,7 +11,8 @@ import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { UploadList } from '@/components/upload/UploadList';
 import type { UploadFile } from '@/components/upload/UploadItem';
-import { BriefFileExplorer, type BriefFile } from './file-explorer';
+import { BriefFileExplorer } from './file-explorer';
+import type { BriefFile } from '@/lib/brief-files-storage';
 import { VideoPreviewModal } from './video-preview-modal';
 import { loadBriefFiles, saveBriefFiles, type StoredBriefFile } from '@/lib/brief-files-storage';
 import type { BriefStatus, Video } from '@/types/index';
@@ -82,6 +83,18 @@ export default function BriefDetailPage() {
   const [previewUrl, setPreviewUrl] = useState<string | null>(null);
   const [previewTitle, setPreviewTitle] = useState<string>('');
 
+  // Raw footage JIT refresh state
+  const [rawFootagePresignedUrl, setRawFootagePresignedUrl] = useState<string | null>(null);
+  const [rawFootageUrlLoading, setRawFootageUrlLoading] = useState(false);
+  const [rawFootageUrlError, setRawFootageUrlError] = useState<string | null>(null);
+
+  // Re-upload handling
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [pendingReuploadTarget, setPendingReuploadTarget] = useState<BriefFile | null>(null);
+
+  // Ref for stale detection (only run once)
+  const staleDetectedRef = useRef(false);
+
   const isUploading = uploads.some((u) => u.status === 'uploading');
 
   // Load persisted files after hydration (client-side only)
@@ -91,6 +104,23 @@ export default function BriefDetailPage() {
     filesLoadedRef.current = true;
     if (stored.length > 0) {
       setBriefFiles(stored);
+    }
+
+    // Stale detection - only run once on hydration
+    if (!staleDetectedRef.current && stored.length > 0) {
+      staleDetectedRef.current = true;
+      // Fire HEAD requests in parallel to detect staleness
+      Promise.all(
+        stored.map(async (f) => {
+          if (!f.url?.startsWith('blob:')) return { ...f, status: 'valid' as const };
+          try {
+            await fetch(f.url, { method: 'HEAD' });
+            return { ...f, status: 'valid' as const };
+          } catch {
+            return { ...f, status: 'expired' as const };
+          }
+        })
+      ).then((detected) => setBriefFiles(detected));
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id]);
@@ -114,17 +144,40 @@ export default function BriefDetailPage() {
     enabled: !!id,
   });
 
+  // JIT refresh raw footage presigned URL on brief load
+  useEffect(() => {
+    if (!brief?.has_raw_footage || !id) return;
+    setRawFootageUrlLoading(true);
+    setRawFootageUrlError(null);
+    api.getDownloadUrl(id)
+      .then(({ download_url }) => setRawFootagePresignedUrl(download_url))
+      .catch((e) => {
+        console.warn('Failed to refresh raw footage URL:', e);
+        setRawFootageUrlError(e instanceof Error ? e.message : 'Failed to load');
+      })
+      .finally(() => setRawFootageUrlLoading(false));
+  }, [brief?.has_raw_footage, brief?.raw_footage_filename, id]);
+
 const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = Array.from(e.target.files || []);
     if (files.length === 0) return;
     if (!id) return;
 
-    const newUploads: UploadFile[] = files.map((file) => ({
+    const file = files[0];
+    const isReupload = pendingReuploadTarget !== null;
+
+    // If reupload, remove the old expired file first
+    if (isReupload) {
+      setBriefFiles((prev) => prev.filter((f) => f.id !== pendingReuploadTarget.id));
+      setPendingReuploadTarget(null);
+    }
+
+    const newUploads: UploadFile[] = [{
       id: crypto.randomUUID(),
       file,
       progress: 0,
       status: 'pending',
-    }));
+    }];
 
     // Append new files to the existing queue (don't start immediately if uploads in progress)
     setUploads((prev) => [...prev, ...newUploads]);
@@ -250,6 +303,13 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     }
   };
 
+  const handleReupload = (expired: BriefFile) => {
+    // Store the target file for replacement after upload completes
+    setPendingReuploadTarget(expired);
+    // Trigger file input click
+    fileInputRef.current?.click();
+  };
+
   const handleCancel = (uploadId: string) => {
     // Find the upload
     const upload = uploads.find((u) => u.id === uploadId);
@@ -273,6 +333,33 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
   };
 
   const briefVideos = videos?.filter((v) => v.briefId === id) ?? [];
+
+  // Merge raw footage + local files, raw footage first
+  const rawFootageEntry: BriefFile | null = brief?.has_raw_footage
+    ? {
+        id: 'raw-footage',
+        name: brief.raw_footage_filename ?? 'raw_footage.mp4',
+        type: 'video/mp4',
+        size: 0,
+        uploadedAt: brief.updated_at ?? new Date().toISOString(),
+        url: rawFootagePresignedUrl ?? undefined,
+        source: 'raw-footage' as const,
+        status: rawFootagePresignedUrl
+          ? 'valid' as const
+          : rawFootageUrlLoading
+            ? 'detecting' as const
+            : 'expired' as const,
+      }
+    : null;
+
+  // Filter out any local entry that might duplicate raw footage (by deduping against filename)
+  const localFiles = briefFiles.filter(
+    (f) => f.source !== 'raw-footage' && f.name !== (rawFootageEntry?.name ?? '')
+  );
+
+  const mergedFiles = rawFootageEntry
+    ? [rawFootageEntry, ...localFiles]
+    : localFiles;
 
   if (briefLoading) {
     return (
@@ -339,6 +426,7 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         <div className="flex gap-4 pt-4 border-t border-gray-100">
           <div>
             <input
+              ref={fileInputRef}
               type="file"
               id="upload-footage"
               multiple
@@ -363,13 +451,14 @@ const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
         )}
 
         <BriefFileExplorer
-          files={briefFiles}
+          files={mergedFiles}
           briefId={id}
           onDownload={(file) => file.url && window.open(file.url, '_blank', 'noopener,noreferrer')}
           onPreview={(file) => {
             setPreviewTitle(file.name);
             setPreviewUrl(file.url ?? null);
           }}
+          onReupload={handleReupload}
         />
       </div>
 
